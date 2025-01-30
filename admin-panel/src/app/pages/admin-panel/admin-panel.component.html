@@ -1,0 +1,26 @@
+<mat-card>
+    <mat-card-header>
+      <mat-card-title>Регистрация нового модератора</mat-card-title>
+    </mat-card-header>
+  
+    <mat-card-content>
+      <form (ngSubmit)="onRegister()" #registerForm="ngForm">
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Telegram ID</mat-label>
+          <input matInput type="number" name="telegramId" [(ngModel)]="telegramId" required />
+        </mat-form-field>
+  
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Пароль</mat-label>
+          <input matInput type="password" name="password" [(ngModel)]="password" required />
+        </mat-form-field>
+  
+        <button mat-raised-button color="primary" type="submit" [disabled]="!registerForm.valid">Зарегистрировать</button>
+      </form>
+    </mat-card-content>
+  
+    <mat-card-footer *ngIf="errorMessage">
+      <div class="error-message">{{ errorMessage }}</div>
+    </mat-card-footer>
+  </mat-card>
+  

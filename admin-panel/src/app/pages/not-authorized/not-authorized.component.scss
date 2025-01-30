@@ -1,0 +1,24 @@
+.not-authorized-card {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+  }
+  
+  mat-card-header {
+    background-color: #f44336;
+    color: white;
+  }
+  
+  mat-card-title {
+    font-size: 24px;
+  }
+  
+  mat-card-content {
+    font-size: 16px;
+  }
+  
+  mat-card-actions {
+    display: flex;
+    justify-content: center;
+  }
+  

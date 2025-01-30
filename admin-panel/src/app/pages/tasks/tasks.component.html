@@ -1,0 +1,110 @@
+<table mat-table [dataSource]="tasks" class="mat-elevation-z8">
+
+  <!-- ID Column -->
+  <ng-container matColumnDef="id">
+    <th mat-header-cell *matHeaderCellDef> ID </th>
+    <td mat-cell *matCellDef="let task"> {{ task.id }} </td>
+  </ng-container>
+
+  <!-- Title Column -->
+  <ng-container matColumnDef="title">
+    <th mat-header-cell *matHeaderCellDef> Название </th>
+    <td mat-cell *matCellDef="let task"> {{ task.title }} </td>
+  </ng-container>
+
+  <!-- Creator Column -->
+  <ng-container matColumnDef="creator">
+    <th mat-header-cell *matHeaderCellDef> Заказчик </th>
+    <td mat-cell *matCellDef="let task"> {{ task.creator.name }} </td>
+  </ng-container>
+
+  <!-- Executor Column -->
+  <ng-container matColumnDef="executor">
+    <th mat-header-cell *matHeaderCellDef> Исполнитель </th>
+    <td mat-cell *matCellDef="let task"> {{ task.executor?.name || 'Not Assigned' }} </td>
+  </ng-container>
+
+  <!-- Description Column -->
+  <ng-container matColumnDef="description">
+    <th mat-header-cell *matHeaderCellDef> Описание </th>
+    <td mat-cell *matCellDef="let task"> {{ task.description }} </td>
+  </ng-container>
+
+  <!-- Location Column -->
+  <ng-container matColumnDef="location">
+    <th mat-header-cell *matHeaderCellDef> Место выполнения </th>
+    <td mat-cell *matCellDef="let task"> {{ task.location }} </td>
+  </ng-container>
+
+  <!-- Payment Column -->
+  <ng-container matColumnDef="payment">
+    <th mat-header-cell *matHeaderCellDef> Оплата </th>
+    <td mat-cell *matCellDef="let task"> {{ task.payment }} </td>
+  </ng-container>
+
+  <!-- Options Column -->
+  <ng-container matColumnDef="options">
+    <th mat-header-cell *matHeaderCellDef> Опции </th>
+    <td mat-cell *matCellDef="let task">
+        @if(task.pack_needed) {
+            <div class="option">
+                📦 Упаковка: {{ task.pack_description || 'Не указано' }}
+            </div>
+        }
+        @if(task.tool_needed) {
+          <div class="option">
+            🛠️ Инструменты: {{ task.tool_description || 'Не указано' }}
+          </div>
+        }
+        @if(task.assemble_needed) {
+          <div class="option">
+            🔧 Сборка: {{ task.assemble_description || 'Не указано' }}
+          </div>
+        }
+        @if(!task.pack_needed && !task.tool_needed && !task.assemble_needed) {
+          <div>
+            Нет опций
+          </div>
+        }
+    </td>
+  </ng-container>
+
+  <!-- Status Column -->
+  <ng-container matColumnDef="status">
+    <th mat-header-cell *matHeaderCellDef> Статус </th>
+    <td mat-cell *matCellDef="let task"> {{ task.status }} </td>
+  </ng-container>
+
+  <!-- Status Column -->
+  <ng-container matColumnDef="photo">
+    <th mat-header-cell *matHeaderCellDef> Фото </th>
+    <td mat-cell *matCellDef="let task"> 
+        <div>
+            <button mat-button color="primary" (click)="openPhotoDialog(task.id)">Фото</button>
+        </div>
+    </td>
+  </ng-container>
+
+  <!-- Actions Column -->
+  <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef>  </th>
+    <td mat-cell *matCellDef="let task">
+        @if(task.status === 'на утверждении' || task.status === 'pending' ){
+            <div>
+                <button mat-button color="primary" (click)="approveTask(task.id)">Утвердить</button>
+            </div>
+        } 
+        @if(task.status === 'утверждено' || task.status === 'approved' ){
+            <div>
+                <button mat-button color="primary" (click)="cancelApproveTask(task.id)">Отменить утверждение</button>
+            </div>
+        } 
+        <div>
+            <button mat-button color="accent">Удалить</button>
+        </div>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>

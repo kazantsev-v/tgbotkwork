@@ -1,0 +1,14 @@
+<h1 mat-dialog-title>Фотографии задачи</h1>
+<div mat-dialog-content>
+    @if(!photos.length) {
+        <div>Нет доступных фотографий.</div>
+    }
+    @for(photo of photos; track photo) {
+        <div class="photo-container">
+            <img [src]="photo.photo_url" alt="Task Photo" class="photo" />
+        </div>
+    }
+</div>
+<div mat-dialog-actions>
+  <button mat-button (click)="close()">Закрыть</button>
+</div>

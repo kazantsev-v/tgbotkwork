@@ -1,0 +1,52 @@
+<mat-table [dataSource]="users" class="mat-elevation-z8">
+  <ng-container matColumnDef="id">
+    <mat-header-cell *matHeaderCellDef> ID </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ user.id }} </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="telegramId">
+    <mat-header-cell *matHeaderCellDef> Telegram ID </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ user.telegramId }} </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="name">
+    <mat-header-cell *matHeaderCellDef> Имя </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ user.name }} </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="role">
+    <mat-header-cell *matHeaderCellDef> Роль </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ prettyRole(user.role) }} </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="photo">
+    <mat-header-cell *matHeaderCellDef> Фото </mat-header-cell>
+    <mat-cell *matCellDef="let user">
+      <img [src]="user.photo" alt="User Photo" width="50">
+    </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="phone">
+    <mat-header-cell *matHeaderCellDef> Телефон </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ user.phone }} </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="balance">
+    <mat-header-cell *matHeaderCellDef> Баланс </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ user.balance }} </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="weeklyIncome">
+    <mat-header-cell *matHeaderCellDef> Доход за неделю </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ getWorker(user)?.weeklyIncome || 'Не известно'}} </mat-cell>
+  </ng-container>
+
+  <ng-container matColumnDef="rating">
+    <mat-header-cell *matHeaderCellDef> Рейтинг </mat-header-cell>
+    <mat-cell *matCellDef="let user"> {{ getWorker(user)?.rating || 'Не известно'}} </mat-cell>
+  </ng-container>
+
+  <mat-header-row *matHeaderRowDef="columns"></mat-header-row>
+  <mat-row *matRowDef="let row; columns: columns;"></mat-row>
+</mat-table>
+  

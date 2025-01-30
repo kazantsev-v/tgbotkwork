@@ -1,0 +1,17 @@
+<div class="login-container">
+    <h1>Вход</h1>
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Telegram ID</mat-label>
+      <input matInput type="number" [(ngModel)]="telegramId" />
+    </mat-form-field>
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Пароль</mat-label>
+      <input matInput type="password" [(ngModel)]="password" />
+    </mat-form-field>
+    <div class="actions">
+        <button mat-raised-button color="primary" (click)="login()">Войти</button>
+    </div>
+    @if(error) {
+        <div class="error-message">{{ error }}</div>
+    }
+  </div>
