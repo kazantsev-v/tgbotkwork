@@ -11,7 +11,6 @@ const { config } = require('./config/config');
 const newUserMiddleware = require('./middlewares/newUserMiddleware');
 
 process.env.NODE_ENV = 'development';
-
 const bot = new Telegraf(config.botToken);
 
 const scenes = require('./scenes');

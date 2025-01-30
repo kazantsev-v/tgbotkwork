@@ -1,5 +1,8 @@
+require('dotenv').config();
+const token = process.env.bot_token;
+
 config = {
-    botToken: process.env.bot_token,
+    botToken: token,
     termsForWorkersLink:"https://law.2gis.ru/licensing-agreement",
     termsForCustomersLink:"https://law.2gis.ru/licensing-agreement",
     port: 3013,
