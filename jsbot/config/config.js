@@ -1,5 +1,5 @@
 config = {
-    botToken: process.env.botToken,
+    botToken: process.env.bot_token,
     termsForWorkersLink:"https://law.2gis.ru/licensing-agreement",
     termsForCustomersLink:"https://law.2gis.ru/licensing-agreement",
     port: 3013,
