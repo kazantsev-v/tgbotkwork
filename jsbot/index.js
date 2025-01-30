@@ -2,6 +2,7 @@ const { Telegraf, Scenes, session } = require('telegraf')
 const express = require('express');
 const fs = require('fs');
 const https = require('https');
+const http = require('http');
 const { default: axios } = require('axios');
 https.globalAgent.options.rejectUnauthorized = false;
 const bodyParser = require('body-parser');
@@ -16,13 +17,13 @@ const bot = new Telegraf(config.botToken);
 const scenes = require('./scenes');
 const { keyboard } = require('telegraf/markup');
 
-const privateKey = fs.readFileSync('privkey.pem', 'utf8');
+/*const privateKey = fs.readFileSync('privkey.pem', 'utf8');
 const certificate = fs.readFileSync('cert.pem', 'utf8');
 
 const credentials = {
     key: privateKey,
     cert: certificate,
-};
+};*/
 
 const stage = new Scenes.Stage(Object.values(scenes));
 bot.use(session());
@@ -60,9 +61,15 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-const httpsServer = https.createServer(credentials, app);
+/*const httpsServer = https.createServer(credentials, app);
 
 httpsServer.listen(config.port, () => {
+    console.log(`Express сервер запущен`);
+});*/
+
+const httpServer = http.createServer(app);
+
+httpServer.listen(config.port, () => {
     console.log(`Express сервер запущен`);
 });
 
