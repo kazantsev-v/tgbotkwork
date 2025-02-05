@@ -65,7 +65,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 // Маршрут для получения файла
 app.get('/api/files/:filename', (req, res) => {
     // Используем process.cwd(), чтобы быть уверенными, что ищем файл относительно корня проекта
-    const filePath = path.join(process.cwd(), 'data', 'uploads', req.params.filename);
+    const filePath = path_1.join(process.cwd(), 'data', 'uploads', req.params.filename);
     console.log('Serving file from:', filePath); // для отладки
     res.sendFile(filePath, (err) => {
         if (err) {
