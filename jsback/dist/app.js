@@ -64,12 +64,9 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 });
 // Маршрут для получения файла
 app.get('/api/files/:filename', (req, res) => {
-    // Используем process.cwd(), чтобы быть уверенными, что ищем файл относительно корня проекта
-    const filePath = path_1.join(process.cwd(), 'data', 'uploads', req.params.filename);
-    console.log('Serving file from:', filePath); // для отладки
+    const filePath = path_1.default.resolve(process.cwd() + '/..', 'data/uploads', req.params.filename);
     res.sendFile(filePath, (err) => {
         if (err) {
-            console.error('Error sending file:', err);
             res.status(404).json({ error: 'File not found' });
         }
     });
