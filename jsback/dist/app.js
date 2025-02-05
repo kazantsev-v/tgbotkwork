@@ -64,7 +64,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 });
 // Маршрут для получения файла
 app.get('/api/files/:filename', (req, res) => {
-    const filePath = path_1.default.resolve("/tgbot/tgbotkwork/jsback/dist" + '/..', 'data/uploads', req.params.filename);
+    const filePath = path_1.default.resolve("/tgbot/tgbotkwork/jsback/dist" + '/.', 'data/uploads', req.params.filename);
     console.log(filePath)
     res.sendFile(filePath, (err) => {
         if (err) {
