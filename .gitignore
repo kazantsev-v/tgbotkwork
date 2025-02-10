@@ -1,4 +1,4 @@
-node_modules/
+jsbot/node_modules/
 *.sqlite
 .env
 jsbot/cert.pem
