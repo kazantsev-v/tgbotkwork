@@ -266,13 +266,11 @@ router.post('/moderators/login', async (req, res) => {
         },
         relations: ["user"]
     });
-    console.log(password, moderator.password)
     if (!moderator) {
         res.status(404).json({ message: 'Модератор не найден' });
     }
     else {
-        const isValidPassword = await moderator.comparePassword(password);
-        if (isValidPassword) {
+        if (String(moderator.password) == password) {
             const token = jsonwebtoken_1.default.sign({ id: moderator.id }, 'secret_key', { expiresIn: '10h' });
             res.status(200).json({ message: 'Авторизация успешна', token });
         }
