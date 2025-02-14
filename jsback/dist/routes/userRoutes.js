@@ -266,6 +266,7 @@ router.post('/moderators/login', async (req, res) => {
         },
         relations: ["user"]
     });
+    console.log(password)
     if (!moderator) {
         res.status(404).json({ message: 'Модератор не найден' });
     }
