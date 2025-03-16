@@ -36,7 +36,18 @@ welcomeScene.enter(async (ctx) => {
             ctx.scene.enter(ctx.session.scene || 'mainScene');
             return;
         } else if (profile.role === 'moderator') {
-            ctx.reply("Раздел для модераторов еще не готов");
+            ctx.reply('Для продолжения примите пользовательское соглашение.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            Markup.button.webApp(
+                                'Админ Панель',
+                                (profile.role === 'moderator'?config.termsForWorkersLink:"https://bot.moverspb.ru:4200/")
+                            )
+                        ],
+                    ],
+                  },
+                });
         }
     } catch (err) {
         //console.log(err.message);
