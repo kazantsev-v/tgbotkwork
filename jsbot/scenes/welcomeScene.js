@@ -42,7 +42,7 @@ welcomeScene.enter(async (ctx) => {
                         [
                             Markup.button.webApp(
                                 'Админ Панель',
-                                (profile.role === 'moderator'?config.termsForWorkersLink:"https://bot.moverspb.ru:4200/")
+                                'https://bot.moverspb.ru:4200'
                             )
                         ],
                     ],
