@@ -96,6 +96,7 @@ const workerInfoScene = new Scenes.BaseScene('workerInfoScene');
                 } else {
                     await ctx.reply('Неверный формат данны.');
                 }
+                break;
             case 'photo':
                 await ctx.reply('Пожалуйста, отправьте фото.');
                 break;
