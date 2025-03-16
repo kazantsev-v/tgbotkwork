@@ -21,7 +21,22 @@ welcomeScene.enter(async (ctx) => {
         ctx.session.userId = profile.id;
         if(!ctx.session.balance)
             ctx.session.balance = 0;
-        if (profile.role === 'customer') { 
+
+
+        if (profile.role === 'moderator') {
+            ctx.reply('Добро пожаловать, модератор.', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            Markup.button.webApp(
+                                'Админ Панель',
+                                'https://bot.moverspb.ru:4200'
+                            )
+                        ],
+                    ],
+                  },
+                });
+        } else if (profile.role === 'customer') { 
             const customerProfile = await getCustomerProfile(ctx.from.id);
             await loadCustomerProfile(customerProfile, ctx);
             console.log(customerProfile);
@@ -35,19 +50,6 @@ welcomeScene.enter(async (ctx) => {
             console.log(workerProfile);
             ctx.scene.enter(ctx.session.scene || 'mainScene');
             return;
-        } else if (profile.role === 'moderator') {
-            ctx.reply('Для продолжения примите пользовательское соглашение.', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            Markup.button.webApp(
-                                'Админ Панель',
-                                'https://bot.moverspb.ru:4200'
-                            )
-                        ],
-                    ],
-                  },
-                });
         }
     } catch (err) {
         //console.log(err.message);
