@@ -73,17 +73,29 @@ const workerInfoScene = new Scenes.BaseScene('workerInfoScene');
                 ctx.session.workerInfo.location = null;
                 ctx.session.workerInfo.metroStation = null;
                 ctx.session.step = 'paymentDetails';
-                await ctx.reply('Введите реквизиты для оплаты (например, номер карты):');
+                await ctx.reply('Выберите реквизит для оплаты', 
+                    Markup.keyboard([
+                        Markup.button.callback('СПБ', 'm_location'),
+                        Markup.button.callback('Номер Карты', 'direct_location'),
+                    ])
+                );
                 break;
             case 'paymentDetails':
+                if(ctx.message.text === 'СПБ') {
+                    await ctx.reply('Введите номер телефона для СБП:');
+                } else if(ctx.message.text === 'Номер Карты') {
+                    await ctx.reply('Введите номер карты:');
+                }
+                ctx.session.step = 'paymentFinish';
+                break;
+            case 'paymentFinish':
                 if (validateCardNumber(ctx.message.text) || validateSBP(ctx.message.text)) {
                     ctx.session.workerInfo.paymentDetails = ctx.message.text;
                     ctx.session.step = 'photo';
                     await ctx.reply('Отправьте фото:');
                 } else {
-                    await ctx.reply('Номер карты введён неверно. Введите 16 цифр или телефон для СБП.');
+                    await ctx.reply('Неверный формат данны.');
                 }
-                break;
             case 'photo':
                 await ctx.reply('Пожалуйста, отправьте фото.');
                 break;
