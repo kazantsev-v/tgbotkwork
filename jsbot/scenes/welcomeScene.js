@@ -1,25 +1,25 @@
 const { Scenes, Markup } = require('telegraf');
 const { workerInfoSessionMock } = require('../models/common');
-const { 
-    initUser, 
-    updateUserSceneStep, 
-    loadWorkerProfile, 
-    loadCustomerProfile, 
-    getUsersProfile, 
-    getWorkerProfile, 
-    getCustomerProfile 
+const {
+    initUser,
+    updateUserSceneStep,
+    loadWorkerProfile,
+    loadCustomerProfile,
+    getUsersProfile,
+    getWorkerProfile,
+    getCustomerProfile
 } = require("../utils/user");
 
 const welcomeScene = new Scenes.BaseScene('welcomeScene');
-  
+
 welcomeScene.enter(async (ctx) => {
-    if(process.env.NODE_ENV ==='development') {
+    if (process.env.NODE_ENV === 'development') {
         //ctx.session = workerInfoSessionMock;
     }
     try {
         const profile = await getUsersProfile(ctx.from.id);
         ctx.session.userId = profile.id;
-        if(!ctx.session.balance)
+        if (!ctx.session.balance)
             ctx.session.balance = 0;
 
 
@@ -34,15 +34,15 @@ welcomeScene.enter(async (ctx) => {
                             )
                         ],
                     ],
-                  },
-                });
-        } else if (profile.role === 'customer') { 
+                },
+            });
+        } else if (profile.role === 'customer') {
             const customerProfile = await getCustomerProfile(ctx.from.id);
             await loadCustomerProfile(customerProfile, ctx);
             console.log(customerProfile);
             ctx.scene.enter(ctx.session.scene || 'mainScene');
             return;
-        } else if(
+        } else if (
             /worker|driver|rigger|dismantler|loader|handyman/.test(profile.role)
         ) {
             const workerProfile = await getWorkerProfile(ctx.from.id);
@@ -61,6 +61,10 @@ welcomeScene.enter(async (ctx) => {
         });
         await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
     }
+
+    const profile = await getUsersProfile(ctx.from.id);
+
+    if (profile.role != 'Модератор') {
         ctx.session.telegramId = ctx.from.id;
         const welcomeText = `
         Ищете работу?
@@ -68,7 +72,7 @@ welcomeScene.enter(async (ctx) => {
         - Сохраните понравившиеся объявления.
         - Получите советы по поиску работы.
         `;
-        await ctx.replyWithPhoto({source : './assets/img/welcome.jpg'}, Markup.removeKeyboard());
+        await ctx.replyWithPhoto({ source: './assets/img/welcome.jpg' }, Markup.removeKeyboard());
         await ctx.reply(welcomeText,
             Markup.inlineKeyboard([
                 Markup.button.callback('Приступить', 'welcome_proceed')
@@ -76,10 +80,11 @@ welcomeScene.enter(async (ctx) => {
         );
         console.log('in end of welcome scene')
 
-    welcomeScene.action('welcome_proceed', async (ctx) => {
-        ctx.session.scene = 'roleSelectionScene';
-        ctx.scene.enter('roleSelectionScene');
-    });
+        welcomeScene.action('welcome_proceed', async (ctx) => {
+            ctx.session.scene = 'roleSelectionScene';
+            ctx.scene.enter('roleSelectionScene');
+        });
+    }
 });
 
 module.exports = welcomeScene;
