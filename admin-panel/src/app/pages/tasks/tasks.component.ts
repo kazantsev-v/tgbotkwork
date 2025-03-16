@@ -56,6 +56,20 @@ export class TasksComponent implements OnInit {
     });
   }
 
+  deleteTask(taskId: number): void {
+    this.taskService.deleteTask(taskId).subscribe({
+      next: () => {
+        this.tasks = this.tasks.filter(task => task.id !== taskId);
+        this.snackBar.open(`Задача ${taskId} удалена`, 'Закрыть', { duration: 3000 });
+      },
+      error: (err) => {
+        this.snackBar.open(`Ошибка: не удалось удалить задачу`, 'Закрыть', { duration: 3000 });
+        console.error(`Ошибка при удалении задачи ${taskId}:`, err);
+      },
+    });
+  }
+  
+
   approveTask(taskId: number) {
     const newStatus = 'approved';
     this.taskService.updateTaskStatus(taskId, newStatus).subscribe({

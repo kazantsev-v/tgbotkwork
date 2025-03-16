@@ -19,6 +19,10 @@ export class TaskService {
   getPhotosByTaskId(taskId: number): Observable<TaskPhoto[]> {
     return this.http.get<TaskPhoto[]>(`${this.baseUrl}/${taskId}/photos`);
   }
+  
+  deleteTask(taskId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${taskId}`);
+  }  
 
   updateTaskStatus(taskId: number, newStatus: string): Observable<void> {
     return this.http.put<void>(`${this.baseUrl}/${taskId}/status`, { status: newStatus });
