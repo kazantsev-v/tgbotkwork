@@ -22,7 +22,6 @@ welcomeScene.enter(async (ctx) => {
         if (!ctx.session.balance)
             ctx.session.balance = 0;
 
-
         if (profile.role === 'moderator') {
             ctx.reply('Добро пожаловать, модератор.', {
                 reply_markup: {
@@ -36,7 +35,6 @@ welcomeScene.enter(async (ctx) => {
                     ],
                 },
             });
-            ctx.scene.enter(ctx.session.scene || 'welcomeScene');
             return;
         } else if (profile.role === 'customer') {
             const customerProfile = await getCustomerProfile(ctx.from.id);

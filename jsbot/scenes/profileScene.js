@@ -16,6 +16,7 @@ profileScene.enter(async (ctx) => {
     const userProfile = isCustomer ? ctx.session.customerInfo : ctx.session.workerInfo; // Получаем профиль из сессии
 
     if (userProfile.photo) {
+        console.log(userProfile)
         if (!userProfile.photo.startsWith("http")) {
             await ctx.replyWithPhoto(userProfile.photo);
         } else {
