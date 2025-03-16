@@ -6,7 +6,7 @@ const mainScene = new Scenes.BaseScene('mainScene');
 mainScene.enter(async (ctx) => {
     await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
     const isCustomer = ctx.session.role === 'customer'; // Проверка роли (заказчик или рабочий)
-    
+    console.log(ctx.session.role)
     const customerButtons = [
         [
             Markup.button.callback('Профиль', 'profile')
