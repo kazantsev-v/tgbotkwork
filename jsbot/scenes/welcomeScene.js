@@ -64,7 +64,7 @@ welcomeScene.enter(async (ctx) => {
 
     const profile = await getUsersProfile(ctx.from.id);
 
-    if (profile.role != 'Модератор') {
+    if (profile.role != 'moderator') {
         ctx.session.telegramId = ctx.from.id;
         const welcomeText = `
         Ищете работу?
