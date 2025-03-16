@@ -20,7 +20,8 @@ profileScene.enter(async (ctx) => {
         if (!userProfile.photo.startsWith("http")) {
             await ctx.replyWithPhoto(userProfile.photo);
         } else {
-            await ctx.replyWithPhoto({ url: userProfile.photo});
+            pics = String(userProfile.photo).replace(/^http:/, "https:");
+            await ctx.replyWithPhoto(pics);
         }
     }
 
