@@ -21,7 +21,7 @@ profileScene.enter(async (ctx) => {
             await ctx.replyWithPhoto(userProfile.photo);
         } else {
             pics = String(userProfile.photo).replace(/^http:/, "https:");
-            await ctx.replyWithPhoto(pics);
+            await ctx.replyWithPhoto({ url: pics});
         }
     }
 
