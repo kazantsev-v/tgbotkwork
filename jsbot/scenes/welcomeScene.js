@@ -36,6 +36,7 @@ welcomeScene.enter(async (ctx) => {
                     ],
                 },
             });
+            return;
         } else if (profile.role === 'customer') {
             const customerProfile = await getCustomerProfile(ctx.from.id);
             await loadCustomerProfile(customerProfile, ctx);
