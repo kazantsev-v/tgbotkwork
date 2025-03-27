@@ -1,0 +1,17 @@
+{
+  "name": "botkwork",
+  "version": "1.0.0",
+  "description": "Bot system with backend and admin panel",
+  "scripts": {
+    "install:all": "node install-deps.js",
+    "start": "node start-service.js",
+    "start:bot": "cd jsbot && node index.js",
+    "start:backend": "cd jsback && node dist/server.js",
+    "start:admin": "cd admin-panel && ng serve --host 0.0.0.0 --port 4200"
+  },
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7"
+  }
+}

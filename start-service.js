@@ -39,6 +39,7 @@ class ServiceManager {
         this.options = {
             cwd: options.cwd || __dirname,
             env: { ...process.env, ...(options.env || {}) },
+            shell: true // Добавляем shell: true для более надежного запуска
         };
         
         this.process = null;
@@ -147,7 +148,7 @@ class ServiceManager {
     }
 }
 
-// Создаем и запускаем сервисы
+// Создаем и запускаем сервисы с использованием 'node' вместо полных путей
 const botService = new ServiceManager(
     'telegram-bot',
     'node',
@@ -162,33 +163,53 @@ const backendService = new ServiceManager(
     { cwd: __dirname }
 );
 
+// Для админки можно использовать npx для запуска Angular CLI если нет глобальной установки
 const adminPanelService = new ServiceManager(
     'admin-panel',
-    'ng',
-    ['serve', '--host', '0.0.0.0', '--port', '4200'],
+    'npx',
+    ['ng', 'serve', '--host', '0.0.0.0', '--port', '4200', '--disable-host-check'],
     { cwd: path.join(__dirname, 'admin-panel') }
 );
 
+// Отображаем информацию о запуске
+console.log('=== Starting Services ===');
+console.log('Working directory:', __dirname);
+console.log('Log directory:', logsDir);
+
+// Функция для задержки
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Запускаем сервисы последовательно
+async function startServices() {
+    try {
+        console.log('\nStarting backend service...');
+        backendService.start();
+        
+        // Ждем, чтобы бэкенд успел инициализироваться
+        await delay(8000);
+        
+        console.log('\nStarting Telegram bot service...');
+        botService.start();
+        
+        // Ждем, чтобы бот успел инициализироваться
+        await delay(5000);
+        
+        console.log('\nStarting admin panel service...');
+        adminPanelService.start();
+    } catch (error) {
+        console.error('Error starting services:', error);
+    }
+}
+
 // Запускаем сервисы
-console.log('Starting all services...');
-backendService.start();
-
-// Запускаем бот с задержкой, чтобы бэкенд успел подняться
-setTimeout(() => {
-    botService.start();
-}, 5000);
-
-// Запускаем админ-панель с еще большей задержкой
-setTimeout(() => {
-    adminPanelService.start();
-}, 10000);
+startServices();
 
 // Обрабатываем сигналы завершения
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
 function handleShutdown(signal) {
-    console.log(`Received ${signal}. Shutting down all services...`);
+    console.log(`\nReceived ${signal}. Shutting down all services...`);
     
     // Останавливаем сервисы
     adminPanelService.stop();
@@ -202,4 +223,4 @@ function handleShutdown(signal) {
     }, 5000);
 }
 
-console.log('Service manager is running. Press Ctrl+C to stop all services.');
+console.log('\nService manager is running. Press Ctrl+C to stop all services.');

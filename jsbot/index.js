@@ -2,6 +2,7 @@ const { Telegraf, Scenes, session } = require('telegraf')
 const express = require('express');
 const fs = require('fs');
 const https = require('https');
+const http = require('http');
 const { default: axios } = require('axios');
 https.globalAgent.options.rejectUnauthorized = false;
 const bodyParser = require('body-parser');
@@ -25,33 +26,6 @@ try {
 
 const scenes = require('./scenes');
 const { keyboard } = require('telegraf/markup');
-
-// Безопасная загрузка SSL сертификатов
-let privateKey, certificate, credentials;
-try {
-    const keyPath = path.resolve(__dirname, '../privkey.pem');
-    const certPath = path.resolve(__dirname, '../cert.pem');
-    
-    if (!fs.existsSync(keyPath)) {
-        throw new Error(`Private key file not found at ${keyPath}`);
-    }
-    if (!fs.existsSync(certPath)) {
-        throw new Error(`Certificate file not found at ${certPath}`);
-    }
-    
-    privateKey = fs.readFileSync(keyPath, 'utf8');
-    certificate = fs.readFileSync(certPath, 'utf8');
-    
-    credentials = {
-        key: privateKey,
-        cert: certificate,
-    };
-    
-    logger.info('SSL certificates loaded successfully');
-} catch (error) {
-    logger.error('Failed to load SSL certificates', { error });
-    process.exit(1);
-}
 
 // Обработка необработанных исключений и отклонений
 process.on('uncaughtException', (error) => {
@@ -164,19 +138,43 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-// Создание HTTPS сервера
-let httpsServer;
-try {
-    httpsServer = https.createServer(credentials, app);
-    logger.info('HTTPS server created');
-} catch (error) {
-    logger.error('Failed to create HTTPS server', { error });
-    process.exit(1);
+// Функция для создания сервера с проверкой наличия SSL-сертификатов
+function createServer() {
+    // Проверяем наличие SSL-сертификатов
+    const keyPath = path.resolve(__dirname, '../privkey.pem');
+    const certPath = path.resolve(__dirname, '../cert.pem');
+    const hasSSLCerts = fs.existsSync(keyPath) && fs.existsSync(certPath);
+    
+    if (hasSSLCerts) {
+        try {
+            const privateKey = fs.readFileSync(keyPath, 'utf8');
+            const certificate = fs.readFileSync(certPath, 'utf8');
+            
+            const credentials = {
+                key: privateKey,
+                cert: certificate,
+            };
+            
+            logger.info('SSL certificates loaded successfully');
+            return https.createServer(credentials, app);
+        } catch (error) {
+            logger.error('Failed to load SSL certificates, using HTTP instead', { error });
+        }
+    } else {
+        logger.warn('SSL certificates not found, using HTTP instead');
+    }
+    
+    // Если сертификаты не найдены или возникла ошибка, запускаем HTTP-сервер
+    return http.createServer(app);
 }
 
+// Создаем сервер
+const server = createServer();
+
 // Запуск сервера
-httpsServer.listen(config.port, () => {
-    logger.info(`Express server running on port ${config.port}`);
+server.listen(config.port, () => {
+    const protocol = server instanceof https.Server ? 'HTTPS' : 'HTTP';
+    logger.info(`${protocol} server running on port ${config.port}`);
 });
 
 // Безопасный запуск бота с обработкой ошибок и повторными попытками
@@ -225,9 +223,9 @@ const gracefulShutdown = (signal) => {
     // Пробуем корректно завершить работу
     Promise.all([
         new Promise(resolve => {
-            if (httpsServer) {
-                httpsServer.close(() => {
-                    logger.info('HTTPS server closed');
+            if (server) {
+                server.close(() => {
+                    logger.info('Server closed');
                     resolve();
                 });
             } else {

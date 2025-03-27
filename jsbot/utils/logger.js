@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { format } = require('date-fns');
 
 // Создаем директорию для логов, если она не существует
 const logsDir = path.join(__dirname, '..', '..', 'logs');
@@ -8,9 +7,29 @@ if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
 }
 
+// Форматирование даты без зависимости от date-fns
+const formatDate = (date) => {
+    const pad = (num) => (num < 10 ? '0' + num : num);
+    
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    
+    return `${year}-${month}-${day}`;
+};
+
+const formatDateTime = (date) => {
+    const dateStr = formatDate(date);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    
+    return `${dateStr} ${hours}:${minutes}:${seconds}`;
+};
+
 // Получаем текущую дату для имени файла
-const getCurrentDate = () => format(new Date(), 'yyyy-MM-dd');
-const getCurrentDateTime = () => format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+const getCurrentDate = () => formatDate(new Date());
+const getCurrentDateTime = () => formatDateTime(new Date());
 
 // Функция для записи лога в файл
 const writeToLogFile = (level, message, details = {}) => {
@@ -26,7 +45,11 @@ const writeToLogFile = (level, message, details = {}) => {
     
     const logString = `[${logEntry.timestamp}] [${level.toUpperCase()}] ${message} ${Object.keys(details).length ? JSON.stringify(details) : ''}\n`;
     
-    fs.appendFileSync(logFilePath, logString);
+    try {
+        fs.appendFileSync(logFilePath, logString);
+    } catch (err) {
+        console.error(`Failed to write to log file: ${err.message}`);
+    }
     
     // Вывод в консоль для отладки
     console[level !== 'error' ? 'log' : 'error'](logString);
