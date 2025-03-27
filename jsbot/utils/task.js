@@ -9,7 +9,8 @@ const {
     convertTimeToDbFormat,
     saveDocument,
 } = require('../utils/common');
-const { catchAxiosError } = require('./errors');
+const { catchAxiosError, retry, safeExecute } = require('./errorHandler');
+const logger = require('./logger');
 const backend_URL = config.backendURL;
 
 const createTask = async (creator, task) => {
@@ -36,128 +37,169 @@ const createTask = async (creator, task) => {
         convertTimeToDbFormat(task.time)
     );
     try {
-        console.log(taskObj);
-        const response = await axios.post(backend_URL+'/tasks', taskObj);
-        console.log('Task saved:', response.data);
+        logger.info('Creating new task', { creator, taskTitle: task.title });
+        const response = await retry(
+            () => axios.post(backend_URL+'/tasks', taskObj),
+            [],
+            { context: 'createTask' }
+        );
+        logger.info('Task saved successfully', { taskId: response.data.task.id });
         return response.data.task; // Успешный ответ
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to create task', { error, creator, taskTitle: task.title });
+        return null;
     }
 }
 
 const uploadTaskPhotos = async (ctx, taskId, photos) => {
+    const results = [];
+    
     for(let photo of photos) {
         try {
+            logger.debug('Uploading photo for task', { taskId, photoId: photo });
             const fileLink = await ctx.telegram.getFileLink(photo);
             const doclink = await saveDocument(fileLink, photo);
-            const response = await axios.post(backend_URL+'/tasks/'+taskId+'/photos', {photoUrl: doclink});
-            console.log('Photo saved:', response.data);
+            const response = await retry(
+                () => axios.post(backend_URL+'/tasks/'+taskId+'/photos', {photoUrl: doclink}),
+                [],
+                { context: 'uploadTaskPhoto', initialDelay: 500, maxRetries: 2 }
+            );
+            logger.debug('Photo saved', { taskId, photoUrl: doclink });
+            results.push(response.data);
         } catch (error) {
-            catchAxiosError(error);
-            
+            logger.error('Failed to upload photo', { error, taskId, photoId: photo });
         }
     }
+    
+    return results.length > 0 ? results : null;
 }
 
 const getPhotosByTaskId = async (taskId) => {
     try {
+        logger.debug('Getting photos for task', { taskId });
         const response = await axios.get(`${backend_URL}/tasks/${taskId}/photos`);
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to get photos', { taskId, error });
+        catchAxiosError(error, `Getting photos for task ${taskId}`);
+        return null;
     }
 }
 
 const getTaskById = async (taskId) => {
     try {
-        const response = await axios.get(`${backend_URL}/tasks/${taskId}`);
+        logger.debug('Getting task by ID', { taskId });
+        const response = await retry(
+            () => axios.get(`${backend_URL}/tasks/${taskId}`),
+            [],
+            { context: `getTaskById-${taskId}` }
+        );
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to get task by ID', { taskId, error });
+        return null;
     }
 }
 
 const getTasksByCreatorId = async (creatorId) => {
     try {
+        logger.debug('Getting tasks by creator ID', { creatorId });
         const response = await axios.get(`${backend_URL}/tasks/creator/${creatorId}`);
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to get tasks by creator ID', { creatorId, error });
+        catchAxiosError(error, `Getting tasks for creator ${creatorId}`);
+        return null;
     }
 }
 
 const getTasksByExecutorId = async (executorId) => {
     try {
+        logger.debug('Getting tasks by executor ID', { executorId });
         const response = await axios.get(`${backend_URL}/tasks/executor/${executorId}`);
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to get tasks by executor ID', { executorId, error });
+        catchAxiosError(error, `Getting tasks for executor ${executorId}`);
+        return null;
     }
 }
 
 const getTasksByModeratorId = async (moderatorId) => {
     try {
+        logger.debug('Getting tasks by moderator ID', { moderatorId });
         const response = await axios.get(`${backend_URL}/tasks/moderator/${moderatorId}`);
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to get tasks by moderator ID', { moderatorId, error });
+        catchAxiosError(error, `Getting tasks for moderator ${moderatorId}`);
+        return null;
     }
 }
 
 const declineTask = async (taskId) => {
     try {
-        const response = await axios.patch(`${backend_URL}/tasks/${taskId}/decline`);
+        logger.info('Declining task', { taskId });
+        const response = await retry(
+            () => axios.patch(`${backend_URL}/tasks/${taskId}/decline`),
+            [],
+            { context: `declineTask-${taskId}` }
+        );
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to decline task', { taskId, error });
+        return null;
     }
 }
 
 const takeTask = async (taskId, userId, status = 'taken') => {
     try {
-        const response = await axios.patch(`${backend_URL}/tasks/${taskId}/take`, { userId, status});
+        logger.info('Taking task', { taskId, userId, status });
+        const response = await retry(
+            () => axios.patch(`${backend_URL}/tasks/${taskId}/take`, { userId, status}),
+            [],
+            { context: `takeTask-${taskId}` }
+        );
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to take task', { taskId, userId, error });
+        return null;
     }
 }
 
 const getAllTasks = async () => {
     try {
+        logger.debug('Getting all tasks');
         const response = await axios.get(`${backend_URL}/tasks`);
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to get all tasks', { error });
+        catchAxiosError(error, 'Getting all tasks');
+        return null;
     }
 }
 
 const getAllApprovedTasks = async () => {
     try {
+        logger.debug('Getting all approved tasks');
         const response = await axios.get(`${backend_URL}/tasks/approved`);
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to get approved tasks', { error });
+        catchAxiosError(error, 'Getting all approved tasks');
+        return null;
     }
 }
 
-
 const searchTasks = async (searchFilters) => {
     try {
+        logger.debug('Searching tasks', { filters: searchFilters });
         const response = await axios.post(`${backend_URL}/tasks/search`, { searchFilters });
         return response.data;
     } catch (error) {
-        catchAxiosError(error);
-        
+        logger.error('Failed to search tasks', { filters: searchFilters, error });
+        catchAxiosError(error, 'Searching tasks');
+        return null;
     }
 }
 

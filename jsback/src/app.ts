@@ -29,7 +29,66 @@ app.use(cors({
     origin: '*', // Источник, с которого разрешены запросы
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], // Разрешённые методы
     credentials: true,
-  }))
+}));
+
+// Добавляем middleware для логирования запросов
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    
+    // Замеряем время выполнения запроса
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+    });
+    
+    next();
+});
+
+// Добавляем обработку ошибок для всех запросов
+app.use((err: any, req: Request, res: Response, next: any) => {
+    console.error(`[${new Date().toISOString()}] Error:`, err);
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
+});
+
+// Эндпоинт для проверки здоровья системы
+app.get('/api/health', async (req: Request, res: Response) => {
+    try {
+        res.status(200).json({ 
+            status: 'ok', 
+            timestamp: new Date().toISOString(),
+            version: process.env.npm_package_version || 'unknown'
+        });
+    } catch (error) {
+        console.error('Health check error:', error);
+        res.status(500).json({ status: 'error', error: (error as Error).message });
+    }
+});
+
+// Эндпоинт для проверки подключения к БД
+app.get('/api/health/db', async (req: Request, res: Response) => {
+    try {
+        if (!AppDataSource.isInitialized) {
+            throw new Error('Database is not initialized');
+        }
+        
+        // Простой запрос для проверки соединения
+        await AppDataSource.query('SELECT 1 as result');
+        
+        res.status(200).json({ 
+            status: 'ok', 
+            message: 'Database connection is healthy',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Database health check error:', error);
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Database connection failed',
+            error: (error as Error).message 
+        });
+    }
+});
 
 // Маршрут для загрузки файла
 app.post('/api/upload', upload.single('file'), async (req: Request, res: Response): Promise<void> => {
@@ -84,14 +143,34 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/reviews", reviewRoutes);
 
-// Запуск подключения к БД
-AppDataSource.initialize()
-    .then(() => {
-        console.log("Database connected");
-        initializeSchedules();
-    })
-    .catch((err) => {
-        console.error("Database connection error", err);
-    });
+// Запуск подключения к БД с улучшенной обработкой ошибок
+let dbConnectionAttempts = 0;
+const MAX_DB_CONNECTION_ATTEMPTS = 5;
+
+function connectToDatabase() {
+    dbConnectionAttempts++;
+    console.log(`Attempting to connect to database (attempt ${dbConnectionAttempts}/${MAX_DB_CONNECTION_ATTEMPTS})...`);
+    
+    AppDataSource.initialize()
+        .then(() => {
+            console.log("Database connected successfully");
+            initializeSchedules();
+        })
+        .catch((err) => {
+            console.error(`Database connection error (attempt ${dbConnectionAttempts}/${MAX_DB_CONNECTION_ATTEMPTS}):`, err);
+            
+            if (dbConnectionAttempts < MAX_DB_CONNECTION_ATTEMPTS) {
+                const timeout = Math.min(1000 * Math.pow(2, dbConnectionAttempts), 30000);
+                console.log(`Retrying in ${timeout/1000} seconds...`);
+                setTimeout(connectToDatabase, timeout);
+            } else {
+                console.error(`Failed to connect to database after ${MAX_DB_CONNECTION_ATTEMPTS} attempts`);
+                // Продолжаем работу даже без базы данных, чтобы API хотя бы частично функционировал
+            }
+        });
+}
+
+// Запускаем подключение к БД
+connectToDatabase();
 
 export default app;
