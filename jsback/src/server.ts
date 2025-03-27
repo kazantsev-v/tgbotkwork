@@ -8,9 +8,10 @@ const PORT = process.env.PORT || 3003;
 
 // Функция для создания HTTP или HTTPS сервера
 function createServer() {
-    // Проверяем наличие SSL-сертификатов для HTTPS
-    const certPath = path.resolve(__dirname, '../', 'cert.pem');
-    const keyPath = path.resolve(__dirname, '../', 'privkey.pem');
+    // Проверяем наличие SSL-сертификатов в папке admin-panel
+    const adminPanelPath = path.resolve(__dirname, '../../admin-panel');
+    const certPath = path.join(adminPanelPath, 'cert.pem');
+    const keyPath = path.join(adminPanelPath, 'privkey.pem');
     
     const useHttps = fs.existsSync(certPath) && fs.existsSync(keyPath);
     
@@ -21,7 +22,7 @@ function createServer() {
             
             const credentials = { key: privateKey, cert: certificate };
             
-            console.log('SSL certificates found, starting HTTPS server');
+            console.log('SSL certificates found in admin-panel folder, starting HTTPS server');
             return https.createServer(credentials, app).listen(PORT, () => {
                 console.log(`HTTPS server running on port ${PORT}`);
             });

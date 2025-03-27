@@ -30,6 +30,48 @@ function createLogStreams(name) {
     return { stdout, stderr };
 }
 
+// Функция для копирования SSL сертификатов из папки admin-panel в корневую директорию
+function copyCertificates() {
+    console.log('Checking SSL certificates...');
+    
+    // Пути к исходным сертификатам в папке admin-panel
+    const adminPanelPath = path.join(__dirname, 'admin-panel');
+    const sourceCertPath = path.join(adminPanelPath, 'cert.pem');
+    const sourceKeyPath = path.join(adminPanelPath, 'privkey.pem');
+    
+    // Пути назначения в корневой директории
+    const destCertPath = path.join(__dirname, 'cert.pem');
+    const destKeyPath = path.join(__dirname, 'privkey.pem');
+    
+    // Проверяем существование исходных файлов и копируем их, если они есть
+    if (fs.existsSync(sourceCertPath) && fs.existsSync(sourceKeyPath)) {
+        try {
+            // Копируем сертификат, если он не существует или отличается от исходного
+            if (!fs.existsSync(destCertPath) || 
+                fs.readFileSync(sourceCertPath, 'utf8') !== fs.readFileSync(destCertPath, 'utf8')) {
+                fs.copyFileSync(sourceCertPath, destCertPath);
+                console.log(`Certificate copied to root directory`);
+            }
+            
+            // Копируем приватный ключ, если он не существует или отличается от исходного
+            if (!fs.existsSync(destKeyPath) || 
+                fs.readFileSync(sourceKeyPath, 'utf8') !== fs.readFileSync(destKeyPath, 'utf8')) {
+                fs.copyFileSync(sourceKeyPath, destKeyPath);
+                console.log(`Private key copied to root directory`);
+            }
+            
+            console.log('SSL certificates are ready in the root directory');
+            return true;
+        } catch (error) {
+            console.error(`Error copying certificates: ${error.message}`);
+        }
+    } else {
+        console.warn('SSL certificates not found in admin-panel folder');
+    }
+    
+    return false;
+}
+
 // Класс для управления сервисом
 class ServiceManager {
     constructor(name, command, args, options = {}) {
@@ -182,6 +224,9 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // Запускаем сервисы последовательно
 async function startServices() {
     try {
+        // Копируем сертификаты перед запуском сервисов
+        copyCertificates();
+        
         console.log('\nStarting backend service...');
         backendService.start();
         

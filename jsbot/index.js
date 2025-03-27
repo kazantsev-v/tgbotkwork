@@ -140,9 +140,10 @@ app.post('/send-message', async (req, res) => {
 
 // Функция для создания сервера с проверкой наличия SSL-сертификатов
 function createServer() {
-    // Проверяем наличие SSL-сертификатов
-    const keyPath = path.resolve(__dirname, '../privkey.pem');
-    const certPath = path.resolve(__dirname, '../cert.pem');
+    // Проверяем наличие SSL-сертификатов (в папке admin-panel)
+    const adminPanelPath = path.resolve(__dirname, '../admin-panel');
+    const keyPath = path.join(adminPanelPath, 'privkey.pem');
+    const certPath = path.join(adminPanelPath, 'cert.pem');
     const hasSSLCerts = fs.existsSync(keyPath) && fs.existsSync(certPath);
     
     if (hasSSLCerts) {
@@ -155,13 +156,13 @@ function createServer() {
                 cert: certificate,
             };
             
-            logger.info('SSL certificates loaded successfully');
+            logger.info('SSL certificates loaded successfully from admin-panel folder');
             return https.createServer(credentials, app);
         } catch (error) {
             logger.error('Failed to load SSL certificates, using HTTP instead', { error });
         }
     } else {
-        logger.warn('SSL certificates not found, using HTTP instead');
+        logger.warn('SSL certificates not found in admin-panel folder, using HTTP instead');
     }
     
     // Если сертификаты не найдены или возникла ошибка, запускаем HTTP-сервер
