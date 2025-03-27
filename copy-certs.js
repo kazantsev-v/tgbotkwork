@@ -27,13 +27,32 @@ const targetDirs = [
     __dirname, // корневая директория
     path.join(__dirname, 'jsbot'), // директория бота
     path.join(__dirname, 'jsback'), // директория бэкенда
+    path.join(__dirname, 'jsback/dist'), // директория компилированного бэкенда
+    path.join(__dirname, 'jsback/dist/src'), // другая возможная директория компилированного бэкенда
 ];
+
+// Также копируем в родительскую директорию относительно компилированных файлов
+// (для относительных путей типа ../privkey.pem)
+[
+    path.join(__dirname, 'jsback'), // родительская директория для dist
+    path.join(__dirname, 'jsback/src'), // родительская директория для dist/src
+    path.join(__dirname, 'jsback/dist'), // родительская директория для dist/server.js
+].forEach(dir => {
+    if (!targetDirs.includes(dir)) {
+        targetDirs.push(dir);
+    }
+});
 
 // Копирование сертификатов во все целевые директории
 try {
     let successCount = 0;
     
     for (const dir of targetDirs) {
+        if (!fs.existsSync(dir)) {
+            console.warn(`⚠️ Directory does not exist, skipping: ${dir}`);
+            continue;
+        }
+        
         const destCertPath = path.join(dir, 'cert.pem');
         const destKeyPath = path.join(dir, 'privkey.pem');
         
