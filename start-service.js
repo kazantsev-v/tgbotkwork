@@ -30,46 +30,56 @@ function createLogStreams(name) {
     return { stdout, stderr };
 }
 
-// Функция для копирования SSL сертификатов из папки admin-panel в корневую директорию
+// Функция для копирования SSL сертификатов из папки admin-panel во все необходимые директории
 function copyCertificates() {
-    console.log('Checking SSL certificates...');
+    console.log('Copying SSL certificates...');
     
     // Пути к исходным сертификатам в папке admin-panel
     const adminPanelPath = path.join(__dirname, 'admin-panel');
     const sourceCertPath = path.join(adminPanelPath, 'cert.pem');
     const sourceKeyPath = path.join(adminPanelPath, 'privkey.pem');
     
-    // Пути назначения в корневой директории
-    const destCertPath = path.join(__dirname, 'cert.pem');
-    const destKeyPath = path.join(__dirname, 'privkey.pem');
-    
-    // Проверяем существование исходных файлов и копируем их, если они есть
-    if (fs.existsSync(sourceCertPath) && fs.existsSync(sourceKeyPath)) {
-        try {
-            // Копируем сертификат, если он не существует или отличается от исходного
-            if (!fs.existsSync(destCertPath) || 
-                fs.readFileSync(sourceCertPath, 'utf8') !== fs.readFileSync(destCertPath, 'utf8')) {
-                fs.copyFileSync(sourceCertPath, destCertPath);
-                console.log(`Certificate copied to root directory`);
-            }
-            
-            // Копируем приватный ключ, если он не существует или отличается от исходного
-            if (!fs.existsSync(destKeyPath) || 
-                fs.readFileSync(sourceKeyPath, 'utf8') !== fs.readFileSync(destKeyPath, 'utf8')) {
-                fs.copyFileSync(sourceKeyPath, destKeyPath);
-                console.log(`Private key copied to root directory`);
-            }
-            
-            console.log('SSL certificates are ready in the root directory');
-            return true;
-        } catch (error) {
-            console.error(`Error copying certificates: ${error.message}`);
-        }
-    } else {
-        console.warn('SSL certificates not found in admin-panel folder');
+    // Проверяем существование исходных файлов
+    if (!fs.existsSync(sourceCertPath) || !fs.existsSync(sourceKeyPath)) {
+        console.warn('SSL certificates not found in admin-panel folder!');
+        return false;
     }
     
-    return false;
+    // Целевые директории для копирования сертификатов
+    const targetDirs = [
+        __dirname, // корневая директория
+        path.join(__dirname, 'jsbot'), // директория бота
+        path.join(__dirname, 'jsback'), // директория бэкенда
+    ];
+    
+    // Копирование сертификатов во все целевые директории
+    let successCount = 0;
+    
+    for (const dir of targetDirs) {
+        const destCertPath = path.join(dir, 'cert.pem');
+        const destKeyPath = path.join(dir, 'privkey.pem');
+        
+        try {
+            // Копируем сертификат
+            fs.copyFileSync(sourceCertPath, destCertPath);
+            
+            // Копируем приватный ключ
+            fs.copyFileSync(sourceKeyPath, destKeyPath);
+            
+            console.log(`Certificates copied to: ${dir}`);
+            successCount++;
+        } catch (dirError) {
+            console.warn(`Could not copy certificates to ${dir}: ${dirError.message}`);
+        }
+    }
+    
+    if (successCount > 0) {
+        console.log(`SSL certificates copied to ${successCount} directories!`);
+        return true;
+    } else {
+        console.error('Could not copy certificates to any directory');
+        return false;
+    }
 }
 
 // Класс для управления сервисом
@@ -225,7 +235,10 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function startServices() {
     try {
         // Копируем сертификаты перед запуском сервисов
-        copyCertificates();
+        const certsReady = copyCertificates();
+        if (!certsReady) {
+            console.warn('Warning: SSL certificates may not be available for all services');
+        }
         
         console.log('\nStarting backend service...');
         backendService.start();

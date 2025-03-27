@@ -14,14 +14,32 @@ const newUserMiddleware = require('./middlewares/newUserMiddleware');
 
 process.env.NODE_ENV = 'development';
 
-// Инициализация бота с обработкой ошибок
+// Инициализация бота с более надежной обработкой ошибок
 let bot;
 try {
+    if (!config.botToken || config.botToken === 'TEST_TOKEN') {
+        throw new Error('Bot token is missing or invalid. Please check your .env file.');
+    }
+    
     bot = new Telegraf(config.botToken);
-    logger.info('Telegram bot initialized');
+    logger.info('Telegram bot initialized with token');
 } catch (error) {
     logger.error('Failed to initialize Telegram bot', { error });
-    process.exit(1);
+    
+    if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+    } else {
+        // В режиме разработки продолжаем работу, но без функциональности бота
+        logger.warn('Running in development mode without bot functionality');
+        bot = {
+            use: () => {},
+            catch: () => {},
+            command: () => {},
+            launch: async () => { return Promise.resolve(true); },
+            stop: () => {},
+            telegram: { sendMessage: async () => { logger.warn('Bot not initialized, message not sent'); } }
+        };
+    }
 }
 
 const scenes = require('./scenes');
@@ -140,29 +158,70 @@ app.post('/send-message', async (req, res) => {
 
 // Функция для создания сервера с проверкой наличия SSL-сертификатов
 function createServer() {
-    // Проверяем наличие SSL-сертификатов (в папке admin-panel)
+    // Проверяем наличие SSL-сертификатов, используя пути из конфигурации
+    const keyPath = path.resolve(__dirname, '..', config.sslKeyPath);
+    const certPath = path.resolve(__dirname, '..', config.sslCertPath);
+    
+    // Проверяем также в корневой и admin-panel директориях
+    const rootKeyPath = path.resolve(__dirname, '../privkey.pem');
+    const rootCertPath = path.resolve(__dirname, '../cert.pem');
     const adminPanelPath = path.resolve(__dirname, '../admin-panel');
-    const keyPath = path.join(adminPanelPath, 'privkey.pem');
-    const certPath = path.join(adminPanelPath, 'cert.pem');
-    const hasSSLCerts = fs.existsSync(keyPath) && fs.existsSync(certPath);
+    const adminKeyPath = path.join(adminPanelPath, 'privkey.pem');
+    const adminCertPath = path.join(adminPanelPath, 'cert.pem');
+    
+    // Определяем, какие пути к сертификатам существуют
+    const keyPathExists = fs.existsSync(keyPath);
+    const certPathExists = fs.existsSync(certPath);
+    const rootPathsExist = fs.existsSync(rootKeyPath) && fs.existsSync(rootCertPath);
+    const adminPathsExist = fs.existsSync(adminKeyPath) && fs.existsSync(adminCertPath);
+    
+    // Логируем информацию о путях для отладки
+    logger.debug('SSL certificate paths', {
+        configKeyPath: keyPath,
+        configCertPath: certPath,
+        configKeyExists: keyPathExists,
+        configCertExists: certPathExists,
+        rootPathsExist,
+        adminPathsExist
+    });
+    
+    // Определяем, какие пути использовать
+    let actualKeyPath, actualCertPath;
+    let hasSSLCerts = false;
+    
+    if (keyPathExists && certPathExists) {
+        actualKeyPath = keyPath;
+        actualCertPath = certPath;
+        hasSSLCerts = true;
+        logger.info('Using SSL certificates from config paths');
+    } else if (rootPathsExist) {
+        actualKeyPath = rootKeyPath;
+        actualCertPath = rootCertPath;
+        hasSSLCerts = true;
+        logger.info('Using SSL certificates from root directory');
+    } else if (adminPathsExist) {
+        actualKeyPath = adminKeyPath;
+        actualCertPath = adminCertPath;
+        hasSSLCerts = true;
+        logger.info('Using SSL certificates from admin-panel directory');
+    }
     
     if (hasSSLCerts) {
         try {
-            const privateKey = fs.readFileSync(keyPath, 'utf8');
-            const certificate = fs.readFileSync(certPath, 'utf8');
+            const privateKey = fs.readFileSync(actualKeyPath, 'utf8');
+            const certificate = fs.readFileSync(actualCertPath, 'utf8');
             
             const credentials = {
                 key: privateKey,
                 cert: certificate,
             };
             
-            logger.info('SSL certificates loaded successfully from admin-panel folder');
             return https.createServer(credentials, app);
         } catch (error) {
             logger.error('Failed to load SSL certificates, using HTTP instead', { error });
         }
     } else {
-        logger.warn('SSL certificates not found in admin-panel folder, using HTTP instead');
+        logger.warn('SSL certificates not found, using HTTP instead');
     }
     
     // Если сертификаты не найдены или возникла ошибка, запускаем HTTP-сервер
