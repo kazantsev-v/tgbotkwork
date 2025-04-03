@@ -1,6 +1,6 @@
 jsbot/node_modules/
 *.sqlite
-.env
+.env  // .env уже добавлен здесь
 jsbot/cert.pem
 jsbot/prevkey.pem
 jsbot/logs/
