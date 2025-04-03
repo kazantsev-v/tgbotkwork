@@ -7,11 +7,14 @@
     "start:bot": "cd jsbot && node start-bot.js",
     "start:backend": "cd jsback/dist && node server.js",
     "start:admin": "cd admin-panel && ng serve --host 0.0.0.0 --ssl true --ssl-cert ./cert.pem --ssl-key ./privkey.pem",
-    "bot:stable": "cd jsbot && node start-bot.js"
+    "bot:stable": "cd jsbot && node start-bot.js",
+    "cleanup": "node cleanup-processes.js",
+    "safe-start": "npm run cleanup && npm start"
   },
   "dependencies": {
     "chalk": "^4.1.2",
     "concurrently": "^8.2.2",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "ps-node": "^0.1.6"
   }
 }

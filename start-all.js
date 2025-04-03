@@ -152,16 +152,91 @@ let botRetries = 0;
 let backendRetries = 0;
 let adminRetries = 0;
 
+// Хранение PID всех запущенных процессов
+const runningProcesses = {
+    bot: null,
+    backend: null,
+    admin: null,
+    children: [] // Хранение всех дочерних процессов
+};
+
+// Добавляем логирование с отметкой времени
+function logWithTime(message, color = 'white') {
+    const now = new Date().toISOString();
+    console.log(chalk[color](`[${now}] ${message}`));
+}
+
+// Функция для корректного завершения всех процессов
+function shutdownGracefully(signal) {
+    logWithTime(`\nПолучен сигнал ${signal}. Завершение всех процессов...`, 'red');
+    
+    // Закрываем readline интерфейс
+    if (rl && typeof rl.close === 'function') {
+        rl.close();
+    }
+    
+    // Завершаем все дочерние процессы
+    runningProcesses.children.forEach(proc => {
+        if (proc && typeof proc.kill === 'function') {
+            try {
+                proc.kill('SIGTERM');
+            } catch (error) {
+                console.error(`Ошибка при завершении процесса: ${error.message}`);
+            }
+        }
+    });
+    
+    // Записываем PID в файл перед выходом для возможности дальнейшей очистки
+    try {
+        const pidInfo = {
+            mainPid: process.pid,
+            children: runningProcesses.children.map(p => p.pid).filter(Boolean)
+        };
+        fs.writeFileSync(path.join(__dirname, 'last-run-pids.json'), JSON.stringify(pidInfo, null, 2));
+    } catch (error) {
+        console.error(`Ошибка при записи PID: ${error.message}`);
+    }
+    
+    logWithTime('Все процессы остановлены.', 'red');
+    
+    // Принудительное завершение через 2 секунды, если что-то блокирует выход
+    setTimeout(() => {
+        logWithTime('Принудительное завершение программы.', 'red');
+        process.exit(0);
+    }, 2000);
+}
+
+// Обработка различных сигналов завершения
+['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGHUP', 'SIGTSTP'].forEach(signal => {
+    process.on(signal, () => shutdownGracefully(signal));
+});
+
 // Функция для запуска процесса с цветным выводом логов и автоматическим перезапуском
 function startProcess(command, args, cwd, name, color, onError = null) {
-    console.log(chalk[color](`Starting ${name}...`));
+    logWithTime(`Starting ${name}...`, color);
     
     const childProcess = spawn(command, args, { 
         cwd, 
         shell: true,
         stdio: ['inherit', 'pipe', 'pipe'],
-        env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: '0' } // Добавляем для решения проблем с SSL
+        env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: '0' }, // Добавляем для решения проблем с SSL
+        detached: false // Убедимся, что процесс не отсоединяется
     });
+    
+    // Сохраняем процесс в список для дальнейшего завершения
+    runningProcesses.children.push(childProcess);
+    
+    // Записываем PID в соответствующее поле
+    if (name === 'TG Bot') {
+        runningProcesses.bot = childProcess;
+    } else if (name === 'Backend') {
+        runningProcesses.backend = childProcess;
+    } else if (name === 'Admin Panel') {
+        runningProcesses.admin = childProcess;
+    }
+    
+    // Логируем PID процесса
+    logWithTime(`${name} started with PID: ${childProcess.pid}`, color);
 
     let errorBuffer = '';
     
@@ -187,7 +262,13 @@ function startProcess(command, args, cwd, name, color, onError = null) {
     });
 
     childProcess.on('close', (code) => {
-        console.log(chalk[color].bold(`[${name}] Process exited with code ${code}`));
+        logWithTime(`[${name}] Process exited with code ${code}`, color);
+        
+        // Удаляем процесс из списка запущенных
+        const index = runningProcesses.children.findIndex(p => p === childProcess);
+        if (index !== -1) {
+            runningProcesses.children.splice(index, 1);
+        }
         
         // Проверяем, нужно ли перезапустить процесс
         if (code !== 0) {
@@ -363,6 +444,11 @@ function handleBackendError(errorText) {
 
 // Запуск всех компонентов
 async function startAll() {
+    // Создаем файл с PID основного процесса
+    fs.writeFileSync(path.join(__dirname, 'main-process.pid'), process.pid.toString());
+    
+    logWithTime(`Основной процесс запущен с PID: ${process.pid}`, 'magenta');
+    
     // Запуск телеграм бота с обработчиком ошибок
     const botProcess = startProcess(
         'node', 
@@ -385,23 +471,18 @@ async function startAll() {
         'yellow'
     );
 
-    // Обработка завершения процесса
-    process.on('SIGINT', () => {
-        console.log(chalk.red.bold('\nStopping all processes...'));
-        
-        botProcess.kill();
-        if (backendProcess) backendProcess.kill();
-        adminProcess.kill();
-        
-        rl.close();
-        
-        setTimeout(() => {
-            console.log(chalk.red.bold('All processes stopped.'));
-            process.exit(0);
-        }, 1000);
+    logWithTime('All services started. Press Ctrl+C to stop all processes.', 'magenta');
+    
+    // Проверка активности дочерних процессов каждую минуту
+    const monitorInterval = setInterval(() => {
+        const activeCount = runningProcesses.children.filter(p => p && !p.killed).length;
+        logWithTime(`Active child processes: ${activeCount}`, 'gray');
+    }, 60000);
+    
+    // Очистка интервала при завершении
+    process.on('exit', () => {
+        clearInterval(monitorInterval);
     });
-
-    console.log(chalk.magenta.bold('All services started. Press Ctrl+C to stop all processes.'));
 }
 
 // Запускаем все компоненты
