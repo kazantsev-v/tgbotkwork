@@ -236,6 +236,35 @@ function executeCommand(command) {
     });
 }
 
+// Вспомогательная функция для получения PID процесса по порту
+function getProcessIdByPort(port) {
+    return new Promise((resolve, reject) => {
+        let command;
+        
+        if (isWindows) {
+            command = `netstat -ano | findstr :${port}`;
+        } else {
+            command = `lsof -i :${port} | grep LISTEN`;
+        }
+        
+        exec(command, (error, stdout) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+            
+            const lines = stdout.trim().split('\n');
+            if (lines.length > 0) {
+                const parts = lines[0].trim().split(/\s+/);
+                const pid = isWindows ? parts[parts.length - 1] : parts[1];
+                resolve(pid);
+            } else {
+                resolve(null);
+            }
+        });
+    });
+}
+
 // Основная функция очистки
 async function cleanup() {
     log('Поиск и завершение "призрачных" процессов...');
@@ -305,11 +334,26 @@ async function cleanup() {
             await killProcess(proc.pid, proc);
         }
         
-        // Проверяем ng serve процессы
+        // Проверяем ng serve процессы (более тщательно)
         const ngProcesses = await findProcesses('ng serve');
         for (const proc of ngProcesses) {
             log(`Найден процесс Angular с PID ${proc.pid} (пользователь: ${proc.user}). Завершаем...`);
             await killProcess(proc.pid, proc);
+        }
+        
+        // Дополнительная проверка процессов Angular на порту 4200
+        try {
+            log('Проверка процессов на порту 4200...');
+            const port4200Pid = await getProcessIdByPort(4200);
+            if (port4200Pid) {
+                const processInfoList = await findProcesses('');
+                const processInfo = processInfoList.find(p => p.pid.toString() === port4200Pid.toString());
+                
+                log(`Найден процесс на порту 4200 с PID ${port4200Pid} (${processInfo ? processInfo.command : 'неизвестно'}). Завершаем...`);
+                await killProcess(port4200Pid, processInfo);
+            }
+        } catch (portError) {
+            log(`Ошибка при проверке порта 4200: ${portError.message}`, true);
         }
         
         log('Очистка завершена успешно!');

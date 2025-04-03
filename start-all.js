@@ -442,6 +442,132 @@ function handleBackendError(errorText) {
     }
 }
 
+// Запуск админ-панели с предварительной проверкой порта
+async function startAdminPanel() {
+    const adminPortFree = await isPortInUse(ADMIN_PORT);
+    
+    if (adminPortFree) {
+        logWithTime(`Порт ${ADMIN_PORT} для админ-панели занят. Попытка освободить...`, 'yellow');
+        const freed = await freePort(ADMIN_PORT, true);
+        
+        if (!freed) {
+            logWithTime(`Не удалось освободить порт ${ADMIN_PORT}. Поиск свободного порта...`, 'yellow');
+            
+            // Пробуем несколько портов
+            let alternativePort = 4201;
+            const maxPort = 4210;
+            
+            while (alternativePort <= maxPort) {
+                if (!(await isPortInUse(alternativePort))) {
+                    logWithTime(`Найден свободный порт: ${alternativePort}`, 'green');
+                    break;
+                }
+                alternativePort++;
+            }
+            
+            if (alternativePort > maxPort) {
+                logWithTime(`Не найден свободный порт для админ-панели в диапазоне 4200-4210`, 'red');
+                return null;
+            }
+            
+            // Запускаем на альтернативном порту
+            return startAngularProcess(alternativePort);
+        }
+    }
+    
+    // Если порт свободен или был освобожден, запускаем на основном порту
+    return startAngularProcess(ADMIN_PORT);
+}
+
+// Специализированная функция для запуска Angular
+function startAngularProcess(port) {
+    logWithTime(`Starting Admin Panel on port ${port}...`, 'yellow');
+    
+    // Используем spawn для запуска процесса Angular CLI,
+    // но с определенными параметрами чтобы избежать интерактивного ввода
+    const command = isWindows ? 'npx.cmd' : 'npx';
+    
+    // Используем полную командную строку для обхода проблем с аргументами Angular CLI
+    const cmdString = `ng serve --host 0.0.0.0 --ssl true --ssl-cert ./cert.pem --ssl-key ./privkey.pem --port ${port} --disable-host-check --no-live-reload`;
+    
+    const childProcess = spawn(command, ['--', ...cmdString.split(' ')], { 
+        cwd: ADMIN_PANEL_DIR, 
+        shell: true,
+        stdio: ['ignore', 'pipe', 'pipe'], // важно установить stdin как 'ignore'
+        env: { 
+            ...process.env,
+            NG_CLI_ANALYTICS: 'false', // отключаем аналитику Angular CLI
+            NODE_OPTIONS: '--max-old-space-size=4096' // увеличиваем доступную память
+        },
+        detached: false
+    });
+    
+    // Сохраняем процесс в список для дальнейшего завершения
+    runningProcesses.children.push(childProcess);
+    runningProcesses.admin = childProcess;
+    
+    // Логируем PID процесса
+    logWithTime(`Admin Panel started with PID: ${childProcess.pid}`, 'yellow');
+
+    let errorBuffer = '';
+    let isStarted = false;
+    
+    childProcess.stdout.on('data', (data) => {
+        const lines = data.toString().trim().split('\n');
+        lines.forEach(line => {
+            if (line.trim()) {
+                console.log(chalk.yellow(`[Admin Panel] ${line}`));
+                
+                // Отмечаем успешный запуск, когда видим характерное сообщение Angular CLI
+                if (line.includes('Compiled successfully') || line.includes('listening on')) {
+                    isStarted = true;
+                    logWithTime(`Admin Panel доступен по адресу: https://localhost:${port}`, 'green');
+                }
+            }
+        });
+    });
+
+    childProcess.stderr.on('data', (data) => {
+        const lines = data.toString().trim().split('\n');
+        errorBuffer += data.toString();
+        
+        lines.forEach(line => {
+            if (line.trim()) {
+                // Фильтруем неважные предупреждения
+                if (!line.includes('NODE_TLS_REJECT_UNAUTHORIZED') && !line.includes('--disable-host-check')) {
+                    console.error(chalk.yellow.bold(`[Admin Panel ERROR] ${line}`));
+                }
+            }
+        });
+    });
+
+    childProcess.on('close', (code) => {
+        logWithTime(`[Admin Panel] Process exited with code ${code}`, 'yellow');
+        
+        // Удаляем процесс из списка запущенных
+        const index = runningProcesses.children.findIndex(p => p === childProcess);
+        if (index !== -1) {
+            runningProcesses.children.splice(index, 1);
+        }
+        
+        if (code !== 0 && !isStarted) {
+            adminRetries++;
+            
+            if (adminRetries <= MAX_RETRIES) {
+                logWithTime(`Перезапуск Admin Panel через 5 секунд... (попытка ${adminRetries}/${MAX_RETRIES})`, 'yellow');
+                
+                setTimeout(() => {
+                    startAdminPanel();
+                }, 5000);
+            } else {
+                logWithTime(`Достигнуто максимальное количество попыток перезапуска для Admin Panel`, 'red');
+            }
+        }
+    });
+
+    return childProcess;
+}
+
 // Запуск всех компонентов
 async function startAll() {
     // Создаем файл с PID основного процесса
@@ -462,14 +588,8 @@ async function startAll() {
     // Запуск бэкенда
     const backendProcess = await startBackend();
 
-    // Запуск админ-панели
-    const adminProcess = startProcess(
-        'ng', 
-        ['serve', '--host', '0.0.0.0', '--ssl', 'true', '--ssl-cert', './cert.pem', '--ssl-key', './privkey.pem'],
-        ADMIN_PANEL_DIR, 
-        'Admin Panel', 
-        'yellow'
-    );
+    // Запуск админ-панели с учетом проверки порта
+    const adminProcess = await startAdminPanel();
 
     logWithTime('All services started. Press Ctrl+C to stop all processes.', 'magenta');
     
