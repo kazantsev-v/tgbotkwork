@@ -10,8 +10,8 @@ termsScene.enter(async (ctx) => {
         reply_markup: {
             inline_keyboard: [
                 [
-                    // Исправляем ошибку - убеждаемся, что для callback_data задано значение
-                    Markup.button.callback('Принять', 'accept_terms')
+                    // Корректная кнопка с callback_data
+                    { text: 'Принять', callback_data: 'accept_terms' }
                 ]
             ]
         }
@@ -28,7 +28,7 @@ termsScene.action('accept_terms', async (ctx) => {
     }
 });
 
-// Добавляем обработчик текстовых сообщений
+// Обработчик текстовых сообщений
 termsScene.on('text', async (ctx) => {
     await ctx.reply('Пожалуйста, нажмите кнопку "Принять" ниже, чтобы продолжить.');
 });

@@ -28,34 +28,19 @@ async function callApi(method, url, data = null, options = {}) {
     const { retries = MAX_RETRIES, retryDelay = RETRY_DELAY } = options;
     let lastError;
 
-    // Логируем запрос для отладки
-    console.log(`Выполнение ${method.toUpperCase()} запроса к ${url}`);
-
     for (let attempt = 0; attempt < retries + 1; attempt++) {
         try {
-            // Создаем конфигурацию запроса в зависимости от метода
-            let requestConfig = { ...options };
-            
-            // Правильная обработка данных в зависимости от HTTP метода
-            const httpMethod = method.toLowerCase();
-            
-            if (httpMethod === 'get') {
-                // Для GET-запросов данные должны передаваться как params, а не в теле запроса
-                if (data) {
-                    requestConfig.params = data;
-                }
-            } else {
-                // Для остальных методов (POST, PUT, PATCH) данные идут в теле запроса
-                if (data !== null && data !== undefined) {
-                    requestConfig.data = data;
-                }
-            }
-            
-            // Добавляем настройки метода и URL
-            requestConfig.method = httpMethod;
-            requestConfig.url = url; // Важно: не добавляем /api - это должно быть в baseURL
+            // Для GET запросов data передается как params
+            const config = method.toLowerCase() === 'get' && data
+                ? { params: data }
+                : { data };
                 
-            const response = await api(requestConfig);
+            const response = await api({
+                method,
+                url,
+                ...config,
+                ...options
+            });
 
             return response.data;
         } catch (error) {
@@ -131,16 +116,16 @@ module.exports = {
     
     // Методы для работы с пользователями
     users: {
-        getProfile: (telegramId) => callApi('get', `users/${telegramId}`),
-        updateProfile: (telegramId, data) => callApi('patch', `users/${telegramId}`, data),
-        createProfile: (data) => callApi('post', 'users', data)
+        getProfile: (telegramId) => callApi('get', `/users/${telegramId}`),
+        updateProfile: (telegramId, data) => callApi('put', `/users/${telegramId}`, data),
+        createProfile: (data) => callApi('post', '/users', data)
     },
     
     // Методы для работы с заказами
     orders: {
-        getAll: (params) => callApi('get', 'orders', params),
-        getById: (id) => callApi('get', `orders/${id}`),
-        create: (data) => callApi('post', 'orders', data),
-        update: (id, data) => callApi('put', `orders/${id}`, data)
+        getAll: (params) => callApi('get', '/orders', params),
+        getById: (id) => callApi('get', `/orders/${id}`),
+        create: (data) => callApi('post', '/orders', data),
+        update: (id, data) => callApi('put', `/orders/${id}`, data)
     }
 };
