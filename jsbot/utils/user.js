@@ -41,37 +41,27 @@ const saveWorkerUser = async (worker) => {
     }
 }
 
+// Восстанавливаем функцию getUsersProfile
 async function getUsersProfile(telegramId) {
     try {
-        console.log(`Запрос профиля пользователя ${telegramId} через API`);
-        const profile = await apiService.users.getUserById(telegramId);
+        const profile = await apiService.users.getProfile(telegramId);
         return profile;
     } catch (error) {
         console.error(`Ошибка при получении профиля пользователя ${telegramId}:`, error.message);
         
-        // Пробуем резервный метод через напрямую axios
-        if (error.status === 400 || error.message.includes('JSON')) {
-            try {
-                console.log(`Пробуем получить профиль через axios напрямую для ${telegramId}`);
-                const response = await axios.get(`${backend_URL}/api/users/${telegramId}`);
-                return response.data;
-            } catch (axiosError) {
-                console.error(`Ошибка прямого запроса axios: ${axiosError.message}`);
+        // Резервный метод через axios
+        try {
+            console.log(`Пробуем получить профиль через прямой axios-запрос`);
+            const response = await axios.get(`${backend_URL}/users/${telegramId}`);
+            return response.data;
+        } catch (axiosError) {
+            // Если и это не сработало, проверяем ошибку 404
+            if (error.status === 404 || axiosError.response?.status === 404) {
+                return null; // Пользователь не найден
             }
+            
+            throw new Error(`Не удалось получить профиль: ${error.message}`);
         }
-        
-        // Можно обработать разные типы ошибок
-        if (error.status === 404) {
-            console.log(`Пользователь ${telegramId} не найден (404)`);
-            return null; // Пользователь не найден
-        }
-        
-        if (error.isNetworkError) {
-            console.error('Сетевая ошибка при запросе к API:', error.originalError?.code);
-        }
-        
-        // Переделываем ошибку наружу для обработки в вызывающем коде
-        throw new Error(`Не удалось получить профиль: ${error.message}`);
     }
 }
 
@@ -156,39 +146,30 @@ const loadWorkerProfile = async (workerObj, ctx) => {
     ctx.session.workerInfo.completedTasks = workerObj.completedTasks;
 }
 
-// Обновим функцию updateUserSceneStep с альтернативными методами обновления
+// Восстанавливаем оригинальную функцию updateUserSceneStep
 const updateUserSceneStep = async (telegramId, scene, step) => {
-    if (!telegramId) {
-        console.error('updateUserSceneStep: telegramId не определен');
-        return false;
-    }
-    
     try {
+        // Проверяем параметры
+        if (!telegramId) {
+            console.error('updateUserSceneStep: telegramId не определен');
+            return false;
+        }
+        
         console.log(`Обновление сцены для пользователя ${telegramId}: ${scene}, шаг ${step}`);
         
-        // Сначала попробуем через специальный метод для обновления сцены
-        try {
-            await apiService.users.updateScene(telegramId, scene, step);
-            return true;
-        } catch (sceneError) {
-            console.log(`Не удалось обновить сцену через endpoint /users/${telegramId}/scene, пробуем через updateProfile...`);
-            
-            // Если не получилось, пробуем через общий метод обновления профиля
-            await apiService.users.updateProfile(telegramId, { scene, step });
-            return true;
-        }
+        // Стандартный метод через API-сервис
+        await apiService.users.updateProfile(telegramId, { scene, step });
+        return true;
     } catch (error) {
-        // Логируем ошибку и пробуем обойти через прямой axios
         console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
         
-        // Последний вариант - прямой вызов через axios с полным URL
+        // Резервный метод через прямой axios-запрос
         try {
-            console.log(`Последняя попытка: прямой вызов axios для обновления сцены...`);
-            await axios.patch(`${backend_URL}/users/${telegramId}/scene`, { scene, step });
-            console.log(`Успешно обновлена сцена напрямую через axios`);
+            await axios.patch(`${backend_URL}/users/${telegramId}`, { scene, step });
+            console.log(`Успешно обновлена сцена через прямой axios-запрос`);
             return true;
-        } catch (finalError) {
-            console.error(`Все попытки обновления сцены не удались:`, finalError.message);
+        } catch (fallbackError) {
+            console.error(`Все попытки обновления сцены не удались:`, fallbackError.message);
             return false;
         }
     }

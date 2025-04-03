@@ -3,11 +3,9 @@ const path = require('path');
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Убеждаемся, что URL не заканчивается на /api, чтобы избежать дублирования в запросах
 const botToken = process.env.BOT_TOKEN;
-const backendURL = (process.env.BACKEND_URL || 'http://bot.moverspb.ru:3003')
-    .replace(/\/api$/, ''); // Убираем "/api" в конце, если он есть
-
+// Используем исходный BACKEND_URL с возможным окончанием на /api
+const backendURL = process.env.BACKEND_URL || 'https://bot.moverspb.ru:3003/api';
 const port = process.env.BOT_PORT || 3013;
 
 exports.config = {
@@ -16,4 +14,4 @@ exports.config = {
     port
 };
 
-console.log(`Загружена конфигурация. API URL: ${backendURL}`);
+console.log(`Конфигурация загружена. Backend URL: ${backendURL}`);
