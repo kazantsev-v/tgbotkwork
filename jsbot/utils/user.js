@@ -142,13 +142,41 @@ const loadWorkerProfile = async (workerObj, ctx) => {
     ctx.session.workerInfo.completedTasks = workerObj.completedTasks;
 }
 
+// Обновим функцию updateUserSceneStep с альтернативными методами обновления
 const updateUserSceneStep = async (telegramId, scene, step) => {
-    try {
-        const response = await apiService.users.updateProfile(telegramId, { scene, step });
-        return true;
-    } catch (error) {
-        console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
+    if (!telegramId) {
+        console.error('updateUserSceneStep: telegramId не определен');
         return false;
+    }
+    
+    try {
+        console.log(`Обновление сцены для пользователя ${telegramId}: ${scene}, шаг ${step}`);
+        
+        // Сначала попробуем через специальный метод для обновления сцены
+        try {
+            await apiService.users.updateScene(telegramId, scene, step);
+            return true;
+        } catch (sceneError) {
+            console.log(`Не удалось обновить сцену через endpoint /users/${telegramId}/scene, пробуем через updateProfile...`);
+            
+            // Если не получилось, пробуем через общий метод обновления профиля
+            await apiService.users.updateProfile(telegramId, { scene, step });
+            return true;
+        }
+    } catch (error) {
+        // Логируем ошибку и пробуем обойти через прямой axios
+        console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
+        
+        // Последний вариант - прямой вызов через axios с полным URL
+        try {
+            console.log(`Последняя попытка: прямой вызов axios для обновления сцены...`);
+            await axios.patch(`${backend_URL}/users/${telegramId}/scene`, { scene, step });
+            console.log(`Успешно обновлена сцена напрямую через axios`);
+            return true;
+        } catch (finalError) {
+            console.error(`Все попытки обновления сцены не удались:`, finalError.message);
+            return false;
+        }
     }
 }
 

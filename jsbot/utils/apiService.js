@@ -23,10 +23,24 @@ const api = axios.create({
 // Функция задержки
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Функция для добавления префикса /api к эндпоинтам
+function getApiUrl(endpoint) {
+    if (!endpoint) return '/api';
+    
+    // Убедимся, что эндпоинт начинается с /, но не содержит /api
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `/api${cleanEndpoint}`;
+}
+
 // Обертка для выполнения запросов с повторными попытками и обработкой ошибок
 async function callApi(method, url, data = null, options = {}) {
     const { retries = MAX_RETRIES, retryDelay = RETRY_DELAY } = options;
     let lastError;
+    
+    // Добавляем /api к URL, если его нет
+    const apiUrl = getApiUrl(url);
+    
+    console.log(`Выполнение ${method.toUpperCase()} запроса к ${apiUrl}`);
 
     for (let attempt = 0; attempt < retries + 1; attempt++) {
         try {
@@ -37,7 +51,7 @@ async function callApi(method, url, data = null, options = {}) {
                 
             const response = await api({
                 method,
-                url,
+                url: apiUrl,
                 ...config,
                 ...options
             });
@@ -46,18 +60,27 @@ async function callApi(method, url, data = null, options = {}) {
         } catch (error) {
             lastError = error;
             
+            // Проверяем, получили ли мы HTML вместо JSON (что означает проблему с API)
+            const isHtmlResponse = error.response?.data && 
+                typeof error.response.data === 'string' && 
+                error.response.data.includes('<!DOCTYPE html>');
+            
+            // Формируем сообщение об ошибке с полной информацией о запросе
+            const requestUrl = `${config.backendURL}${apiUrl}`;
+            
             // Подробное логирование ошибки
             console.error(`API ошибка (попытка ${attempt + 1}/${retries + 1}) для ${method} ${url}:`, {
                 message: error.message,
                 code: error.code,
                 status: error.response?.status,
-                data: error.response?.data,
+                data: isHtmlResponse ? 'HTML response received instead of JSON' : error.response?.data,
                 config: {
                     url: error.config?.url,
                     method: error.config?.method,
                     data: error.config?.data,
                     headers: error.config?.headers
-                }
+                },
+                fullUrl: requestUrl
             });
 
             // Если это не последняя попытка, и ошибка подходит для повторной попытки
@@ -68,7 +91,7 @@ async function callApi(method, url, data = null, options = {}) {
             }
 
             // Преобразуем ошибку в удобный формат перед выбросом
-            throw formatError(error);
+            throw formatError(error, requestUrl);
         }
     }
 
@@ -87,17 +110,35 @@ function shouldRetry(error) {
     );
 }
 
-// Форматирование ошибки в единый формат
-function formatError(error) {
-    const formattedError = new Error(
-        error.response?.data?.message || error.message || 'Неизвестная ошибка API'
-    );
+// Улучшенное форматирование ошибки
+function formatError(error, requestUrl) {
+    // Определяем понятный текст ошибки в зависимости от статуса
+    let message = error.message;
+    
+    if (error.response) {
+        const status = error.response.status;
+        
+        if (status === 404) {
+            message = `Ресурс не найден: ${requestUrl}`;
+        } else if (status === 401 || status === 403) {
+            message = 'Ошибка авторизации при обращении к API';
+        } else if (status >= 500) {
+            message = 'Ошибка сервера API. Пожалуйста, попробуйте позже';
+        }
+    } else if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+        message = 'Таймаут запроса к API. Сервер недоступен или перегружен';
+    } else if (error.code === 'ECONNREFUSED') {
+        message = 'Не удалось подключиться к серверу API. Сервер недоступен';
+    }
+    
+    const formattedError = new Error(message);
     
     formattedError.originalError = error;
     formattedError.status = error.response?.status;
     formattedError.data = error.response?.data;
     formattedError.isNetworkError = !error.response;
     formattedError.isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
+    formattedError.requestUrl = requestUrl;
     
     return formattedError;
 }
@@ -118,6 +159,7 @@ module.exports = {
     users: {
         getProfile: (telegramId) => callApi('get', `/users/${telegramId}`),
         updateProfile: (telegramId, data) => callApi('put', `/users/${telegramId}`, data),
+        updateScene: (telegramId, scene, step) => callApi('patch', `/users/${telegramId}/scene`, { scene, step }),
         createProfile: (data) => callApi('post', '/users', data)
     },
     
