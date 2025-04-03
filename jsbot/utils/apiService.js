@@ -44,18 +44,30 @@ async function callApi(method, url, data = null, options = {}) {
 
     for (let attempt = 0; attempt < retries + 1; attempt++) {
         try {
-            // Для GET запросов data передается как params
-            const config = method.toLowerCase() === 'get' && data
-                ? { params: data }
-                : { data };
+            // Создаем конфигурацию запроса в зависимости от метода
+            let requestConfig = { ...options };
+            
+            // Правильная обработка данных в зависимости от HTTP метода
+            const httpMethod = method.toLowerCase();
+            
+            if (httpMethod === 'get') {
+                // Для GET-запросов данные должны передаваться как params, а не в теле запроса
+                if (data) {
+                    requestConfig.params = data;
+                }
+            } else {
+                // Для остальных методов (POST, PUT, PATCH) данные идут в теле запроса
+                // Проверяем, что данные не null и не undefined
+                if (data !== null && data !== undefined) {
+                    requestConfig.data = data;
+                }
+            }
+            
+            // Добавляем настройки метода и URL
+            requestConfig.method = httpMethod;
+            requestConfig.url = apiUrl;
                 
-            const response = await api({
-                method,
-                url: apiUrl,
-                ...config,
-                ...options
-            });
-
+            const response = await api(requestConfig);
             return response.data;
         } catch (error) {
             lastError = error;
@@ -158,6 +170,7 @@ module.exports = {
     // Методы для работы с пользователями
     users: {
         getProfile: (telegramId) => callApi('get', `/users/${telegramId}`),
+        getUserById: (id) => callApi('get', `/users/${id}`, null),
         updateProfile: (telegramId, data) => callApi('put', `/users/${telegramId}`, data),
         updateScene: (telegramId, scene, step) => callApi('patch', `/users/${telegramId}/scene`, { scene, step }),
         createProfile: (data) => callApi('post', '/users', data)

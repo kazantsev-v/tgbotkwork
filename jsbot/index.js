@@ -8,6 +8,13 @@ const bodyParser = require('body-parser');
 const { config } = require('./config/config');
 
 const newUserMiddleware = require('./middlewares/newUserMiddleware');
+const errorHandlingMiddleware = require('./middlewares/errorHandlingMiddleware');
+
+// Добавляем middleware для логирования
+const requestLoggingMiddleware = (ctx, next) => {
+    console.log(`[BOT] Новый апдейт: ${ctx.updateType} от пользователя ${ctx.from?.id || 'Unknown'}`);
+    return next();
+};
 
 process.env.NODE_ENV = 'development';
 
@@ -35,6 +42,9 @@ bot.use((ctx, next) => {
     return next();
 });
 
+// Добавляем middleware для обработки ошибок
+bot.use(requestLoggingMiddleware);
+bot.use(errorHandlingMiddleware);
 bot.use(newUserMiddleware);
 
 bot.command('start', async (ctx) => {

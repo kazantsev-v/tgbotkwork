@@ -43,12 +43,26 @@ const saveWorkerUser = async (worker) => {
 
 async function getUsersProfile(telegramId) {
     try {
-        const profile = await apiService.users.getProfile(telegramId);
+        console.log(`Запрос профиля пользователя ${telegramId} через API`);
+        const profile = await apiService.users.getUserById(telegramId);
         return profile;
     } catch (error) {
         console.error(`Ошибка при получении профиля пользователя ${telegramId}:`, error.message);
+        
+        // Пробуем резервный метод через напрямую axios
+        if (error.status === 400 || error.message.includes('JSON')) {
+            try {
+                console.log(`Пробуем получить профиль через axios напрямую для ${telegramId}`);
+                const response = await axios.get(`${backend_URL}/api/users/${telegramId}`);
+                return response.data;
+            } catch (axiosError) {
+                console.error(`Ошибка прямого запроса axios: ${axiosError.message}`);
+            }
+        }
+        
         // Можно обработать разные типы ошибок
         if (error.status === 404) {
+            console.log(`Пользователь ${telegramId} не найден (404)`);
             return null; // Пользователь не найден
         }
         
