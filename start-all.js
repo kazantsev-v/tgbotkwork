@@ -39,9 +39,9 @@ async function cleanupBeforeStart() {
     logWithTime('Автоматическая очистка процессов перед запуском...', 'yellow');
     
     try {
-        // Запускаем внешний процесс cleanup с флагом --auto-kill
+        // Запускаем внешний процесс cleanup с флагами для автоматического и неинтерактивного режима
         await new Promise((resolve) => {
-            const cleanupProcess = spawn('node', ['cleanup-processes.js', '--auto-kill'], {
+            const cleanupProcess = spawn('node', ['cleanup-processes.js', '--auto-kill', '--non-interactive'], {
                 stdio: 'inherit'
             });
             

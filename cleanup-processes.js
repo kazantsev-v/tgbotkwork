@@ -7,15 +7,27 @@ const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
 const isMac = process.platform === 'darwin';
 
-// Предустановленный пароль для sudo
+// Проверяем, запущен ли скрипт в TTY (интерактивном режиме)
+const isTTY = process.stdin.isTTY;
+
+// Параметры и флаги
 const SUDO_PASSWORD = 'yD8eY9nZ4z';
 const AUTO_KILL = process.argv.includes('--auto-kill');
+const FORCE_NON_INTERACTIVE = process.argv.includes('--non-interactive') || !isTTY;
 
-// Создаем интерфейс для чтения ввода пользователя
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+// Создаем интерфейс readline только если мы в интерактивном режиме
+let rl = null;
+if (!FORCE_NON_INTERACTIVE) {
+    try {
+        rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+    } catch (error) {
+        console.log(`Не удалось создать интерактивный интерфейс: ${error.message}`);
+        console.log('Переключение в неинтерактивный режим');
+    }
+}
 
 // Функция для логирования с отметкой времени
 function log(message, isError = false) {
@@ -40,6 +52,45 @@ function log(message, isError = false) {
         );
     } catch (e) {
         // Игнорируем ошибки записи в файл
+    }
+}
+
+// Безопасное закрытие readline
+function safeCloseReadline() {
+    if (rl && typeof rl.close === 'function') {
+        try {
+            rl.close();
+        } catch (error) {
+            console.log(`Не удалось закрыть readline интерфейс: ${error.message}`);
+        }
+    }
+}
+
+// Функция для неинтерактивного запроса (всегда возвращает true или заданное значение)
+function nonInteractivePrompt(message, defaultAnswer = true) {
+    log(`[Неинтерактивный режим] ${message} Автоматический ответ: ${defaultAnswer ? 'да' : 'нет'}`);
+    return Promise.resolve(defaultAnswer);
+}
+
+// Функция для интерактивного запроса
+function interactivePrompt(message) {
+    if (!rl) {
+        return Promise.resolve(true);
+    }
+    
+    return new Promise((resolve) => {
+        rl.question(message, (answer) => {
+            resolve(answer.toLowerCase() === 'y');
+        });
+    });
+}
+
+// Универсальная функция запроса, которая выбирает нужный режим
+function prompt(message, defaultValue = true) {
+    if (FORCE_NON_INTERACTIVE || AUTO_KILL) {
+        return nonInteractivePrompt(message, defaultValue);
+    } else {
+        return interactivePrompt(message);
     }
 }
 
@@ -148,7 +199,7 @@ async function killProcess(pid, processInfo) {
                     log(`Недостаточно прав для завершения процесса ${pid}, используем sudo`);
                     
                     // Если включен автоматический режим, используем sudo без запроса
-                    if (AUTO_KILL) {
+                    if (AUTO_KILL || FORCE_NON_INTERACTIVE) {
                         try {
                             await executeSudo(`kill -9 ${pid}`);
                             log(`Процесс ${pid} успешно завершен с sudo`);
@@ -159,23 +210,22 @@ async function killProcess(pid, processInfo) {
                         }
                     } else {
                         // Если не автоматический режим, спрашиваем пользователя
-                        return new Promise((resolve) => {
-                            rl.question(`Процесс ${pid} (${processInfo?.command}) принадлежит пользователю ${processInfo?.user}. Использовать sudo? (y/n): `, async (answer) => {
-                                if (answer.toLowerCase() === 'y') {
-                                    try {
-                                        await executeSudo(`kill -9 ${pid}`);
-                                        log(`Процесс ${pid} успешно завершен с sudo`);
-                                        resolve(true);
-                                    } catch (sudoError) {
-                                        log(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, true);
-                                        resolve(false);
-                                    }
-                                } else {
-                                    log(`Пропускаем процесс ${pid}`);
-                                    resolve(false);
-                                }
-                            });
-                        });
+                        const userrQuestion = `Процесс ${pid} (${processInfo?.command}) принадлежит пользователю ${processInfo?.user}. Использовать sudo? (y/n): `;
+                        const answer = await prompt(userrQuestion);
+                        
+                        if (answer) {
+                            try {
+                                await executeSudo(`kill -9 ${pid}`);
+                                log(`Процесс ${pid} успешно завершен с sudo`);
+                                return true;
+                            } catch (sudoError) {
+                                log(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, true);
+                                return false;
+                            }
+                        } else {
+                            log(`Пропускаем процесс ${pid}`);
+                            return false;
+                        }
                     }
                 } else {
                     throw error;
@@ -333,7 +383,8 @@ async function cleanup() {
             log(error.stack, true);
         }
     } finally {
-        rl.close();
+        // Безопасно закрываем readline
+        safeCloseReadline();
     }
 }
 
