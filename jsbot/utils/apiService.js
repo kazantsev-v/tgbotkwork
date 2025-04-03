@@ -7,11 +7,8 @@ const TIMEOUT = parseInt(process.env.HTTP_TIMEOUT) || 30000; // 30 секунд 
 const MAX_RETRIES = 3; // Максимальное количество повторных попыток
 const RETRY_DELAY = 1000; // Задержка между повторными попытками (1 секунда)
 
-// Проверяем, что URL API установлен правильно
-const BASE_URL = config.apiUrl || config.backendURL || process.env.BACKEND_URL || 'https://bot.moverspb.ru:3003/api';
-
-// Вывод информации о том, какой URL используется
-console.log(`API-сервис использует URL: ${BASE_URL}`);
+// Получаем базовый URL из конфигурации
+const BASE_URL = config.backendURL;
 
 // Создаем экземпляр axios с общими настройками
 const api = axios.create({
@@ -29,19 +26,24 @@ const api = axios.create({
 // Функция задержки
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Валидация URL перед запросом
-function validateUrl(baseUrl, relativePath) {
-    if (!baseUrl) {
-        throw new Error('API URL не настроен. Проверьте config.apiUrl или BACKEND_URL в .env');
-    }
-    
+// Безопасный метод для работы с URL
+function safeJoinUrl(base, endpoint) {
     try {
-        // Проверим, что URL валидный
-        const url = new URL(relativePath, baseUrl);
-        return url.toString();
+        if (!base) {
+            console.error('Базовый URL не установлен');
+            return endpoint;
+        }
+        
+        // Убираем / в конце базового URL
+        const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+        
+        // Добавляем / в начало endpoint, если его нет
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+        
+        return cleanBase + cleanEndpoint;
     } catch (error) {
-        console.error(`Неверный URL: ${baseUrl}${relativePath}`, error.message);
-        throw new Error(`Некорректный URL: ${error.message}`);
+        console.error(`Ошибка при формировании URL: ${error.message}`);
+        return base + '/' + endpoint;
     }
 }
 
@@ -50,13 +52,9 @@ async function callApi(method, url, data = null, options = {}) {
     const { retries = MAX_RETRIES, retryDelay = RETRY_DELAY } = options;
     let lastError;
 
-    // Проверяем URL перед запросом
-    try {
-        validateUrl(BASE_URL, url);
-    } catch (error) {
-        console.error(`Ошибка валидации URL перед запросом ${method} ${url}:`, error.message);
-        throw error;
-    }
+    // Пробуем сформировать полный URL для логирования
+    const fullUrl = safeJoinUrl(BASE_URL, url);
+    console.log(`Выполняется запрос: ${method.toUpperCase()} ${fullUrl}`);
 
     for (let attempt = 0; attempt < retries + 1; attempt++) {
         try {
@@ -76,6 +74,9 @@ async function callApi(method, url, data = null, options = {}) {
         } catch (error) {
             lastError = error;
             
+            // Проверяем, есть ли у ошибки свойство config для доступа к данным запроса
+            const errorConfig = error.config || {};
+            
             // Подробное логирование ошибки
             console.error(`API ошибка (попытка ${attempt + 1}/${retries + 1}) для ${method} ${url}:`, {
                 message: error.message,
@@ -83,12 +84,18 @@ async function callApi(method, url, data = null, options = {}) {
                 status: error.response?.status,
                 data: error.response?.data,
                 config: {
-                    url: error.config?.url,
-                    method: error.config?.method,
-                    data: error.config?.data,
-                    headers: error.config?.headers
+                    url: errorConfig.url,
+                    method: errorConfig.method,
+                    data: errorConfig.data,
+                    headers: errorConfig.headers
                 }
             });
+
+            // Если ошибка связана с недопустимым URL, перехватываем ее
+            if (error.message && error.message.includes('Invalid URL') || error.code === 'ERR_INVALID_URL') {
+                console.error(`Недопустимый URL: ${fullUrl}. Проверьте настройки URL в config или переменные окружения.`);
+                throw new Error(`Недопустимый URL при запросе к ${url}. Проверьте настройки конфигурации API.`);
+            }
 
             // Если это не последняя попытка, и ошибка подходит для повторной попытки
             if (attempt < retries && shouldRetry(error)) {
@@ -134,9 +141,6 @@ function formatError(error) {
 
 // Экспортируем методы для работы с API
 module.exports = {
-    // Добавляем базовый URL для дебага
-    baseUrl: BASE_URL,
-    
     // Общий метод для запросов
     request: callApi,
     

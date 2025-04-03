@@ -142,7 +142,7 @@ const loadWorkerProfile = async (workerObj, ctx) => {
     ctx.session.workerInfo.completedTasks = workerObj.completedTasks;
 }
 
-// Обновим функцию updateUserSceneStep с обработкой ошибок URL
+// Модифицируем функцию updateUserSceneStep с улучшенной обработкой ошибок URL
 async function updateUserSceneStep(telegramId, scene, step) {
     if (!telegramId) {
         console.error('updateUserSceneStep: telegramId не определен');
@@ -150,23 +150,21 @@ async function updateUserSceneStep(telegramId, scene, step) {
     }
     
     try {
-        // Логируем для отладки
-        console.log(`Обновление сцены для пользователя ${telegramId}: сцена=${scene}, шаг=${step}`);
-        
         // Используем API сервис для обновления профиля
         await apiService.users.updateProfile(telegramId, { scene, step });
         return true;
     } catch (error) {
         console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
         
-        // Если это ошибка URL, пытаемся использовать старый метод через axios напрямую
-        if (error.message.includes('URL')) {
+        // Защита от ошибок URL - пробуем запасной вариант через прямой axios запрос
+        if (error.message.includes('URL') || error.message.includes('Invalid')) {
             try {
-                console.log(`Падбек: использование прямого вызова через axios для ${telegramId}`);
+                console.log(`Резервный путь: использование axios для обновления сцены пользователя ${telegramId}`);
                 await axios.patch(`${backend_URL}/users/${telegramId}`, { scene, step });
+                console.log(`Успешное обновление через резервный путь`);
                 return true;
-            } catch (axiosError) {
-                console.error('Ошибка падбека:', axiosError.message);
+            } catch (fallbackError) {
+                console.error(`Ошибка резервного пути: ${fallbackError.message}`);
             }
         }
         
