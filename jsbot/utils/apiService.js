@@ -28,17 +28,24 @@ async function callApi(method, url, data = null, options = {}) {
     const { retries = MAX_RETRIES, retryDelay = RETRY_DELAY } = options;
     let lastError;
 
+    // Убедимся, что URL не начинается с символа /, так как baseURL уже содержит /api
+    const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
+    
+    // Логируем полный URL для отладки
+    const fullUrl = `${config.backendURL}/${cleanUrl}`;
+    console.log(`API запрос: ${method.toUpperCase()} ${fullUrl}`);
+
     for (let attempt = 0; attempt < retries + 1; attempt++) {
         try {
             // Для GET запросов data передается как params
-            const config = method.toLowerCase() === 'get' && data
+            const reqConfig = method.toLowerCase() === 'get' && data
                 ? { params: data }
                 : { data };
                 
             const response = await api({
                 method,
-                url,
-                ...config,
+                url: cleanUrl, // Используем очищенный URL
+                ...reqConfig,
                 ...options
             });
 
@@ -47,7 +54,7 @@ async function callApi(method, url, data = null, options = {}) {
             lastError = error;
             
             // Подробное логирование ошибки
-            console.error(`API ошибка (попытка ${attempt + 1}/${retries + 1}) для ${method} ${url}:`, {
+            console.error(`API ошибка (попытка ${attempt + 1}/${retries + 1}) для ${method} ${cleanUrl}:`, {
                 message: error.message,
                 code: error.code,
                 status: error.response?.status,
@@ -116,9 +123,9 @@ module.exports = {
     
     // Методы для работы с пользователями
     users: {
-        getProfile: (telegramId) => callApi('get', `/users/${telegramId}`),
-        updateProfile: (telegramId, data) => callApi('put', `/users/${telegramId}`, data),
-        createProfile: (data) => callApi('post', '/users', data)
+        getProfile: (telegramId) => callApi('get', `users/${telegramId}`),
+        updateProfile: (telegramId, data) => callApi('patch', `users/${telegramId}`, data), // Меняем PUT на PATCH
+        createProfile: (data) => callApi('post', 'users', data)
     },
     
     // Методы для работы с заказами

@@ -10,9 +10,21 @@ const { config } = require('./config/config');
 const newUserMiddleware = require('./middlewares/newUserMiddleware');
 const errorHandlingMiddleware = require('./middlewares/errorHandlingMiddleware');
 
-// Добавляем middleware для логирования
+// Улучшенный middleware для логирования запросов с информацией о пользователе
 const requestLoggingMiddleware = (ctx, next) => {
-    console.log(`[BOT] Новый апдейт: ${ctx.updateType} от пользователя ${ctx.from?.id || 'Unknown'}`);
+    const userId = ctx.from?.id || 'Unknown';
+    const username = ctx.from?.username ? `@${ctx.from.username}` : 'No username';
+    const updateType = ctx.updateType || 'Unknown';
+    
+    console.log(`[BOT] Новый ${updateType} от ${userId} (${username})`);
+    
+    // Если это сообщение, логируем его содержимое
+    if (ctx.message?.text) {
+        console.log(`[BOT] Сообщение: "${ctx.message.text}"`);
+    } else if (ctx.callbackQuery?.data) {
+        console.log(`[BOT] Callback data: "${ctx.callbackQuery.data}"`);
+    }
+    
     return next();
 };
 
@@ -33,22 +45,50 @@ const credentials = {
 
 const stage = new Scenes.Stage(Object.values(scenes));
 bot.use(session());
+bot.use(requestLoggingMiddleware); // Логирование должно быть до всех остальных обработчиков
 bot.use(stage.middleware());
 
+// Добавляем обработчик ошибок сцен
 bot.use((ctx, next) => {
-    if (ctx.session.currentScene) {
-        ctx.scene.enter(ctx.session.currentScene);
+    if (ctx.session?.currentScene) {
+        try {
+            return ctx.scene.enter(ctx.session.currentScene);
+        } catch (error) {
+            console.error(`Ошибка при входе в сцену ${ctx.session.currentScene}:`, error.message);
+            // Проверяем, существует ли сцена
+            const sceneExists = Object.values(scenes).some(s => s.id === ctx.session.currentScene);
+            if (!sceneExists) {
+                console.log(`Сцена ${ctx.session.currentScene} не найдена, переход в welcomeScene`);
+                ctx.session.currentScene = 'welcomeScene';
+                return ctx.scene.enter('welcomeScene');
+            }
+        }
     }
     return next();
 });
 
-// Добавляем middleware для обработки ошибок
-bot.use(requestLoggingMiddleware);
-bot.use(errorHandlingMiddleware);
-bot.use(newUserMiddleware);
-
+// Добавляем расширенный обработчик для команды /start
 bot.command('start', async (ctx) => {
-    await ctx.scene.enter('welcomeScene');
+    console.log(`Получена команда /start от пользователя ${ctx.from.id}`);
+    try {
+        // Сбрасываем сессию для чистого старта
+        ctx.session = { 
+            telegramId: ctx.from.id,
+            step: 0
+        };
+        await ctx.scene.enter('welcomeScene');
+    } catch (error) {
+        console.error('Ошибка при обработке команды /start:', error);
+        await ctx.reply('Произошла ошибка при запуске бота. Пожалуйста, попробуйте снова через несколько минут.');
+    }
+});
+
+// Добавляем обработчик текстовых сообщений, которые не обработаны сценами
+bot.on('text', async (ctx) => {
+    if (!ctx.scene?.current) {
+        console.log(`Получено сообщение вне сцены: ${ctx.message.text}`);
+        return ctx.scene.enter('welcomeScene');
+    }
 });
 
 const app = express();

@@ -41,23 +41,34 @@ const saveWorkerUser = async (worker) => {
     }
 }
 
+// Улучшаем функцию getUsersProfile с резервным методом при ошибках API
 async function getUsersProfile(telegramId) {
     try {
+        console.log(`Запрос профиля для пользователя ${telegramId}`);
         const profile = await apiService.users.getProfile(telegramId);
+        console.log(`Получен профиль для ${telegramId}:`, JSON.stringify(profile).substring(0, 100) + '...');
         return profile;
     } catch (error) {
         console.error(`Ошибка при получении профиля пользователя ${telegramId}:`, error.message);
-        // Можно обработать разные типы ошибок
-        if (error.status === 404) {
-            return null; // Пользователь не найден
-        }
         
-        if (error.isNetworkError) {
-            console.error('Сетевая ошибка при запросе к API:', error.originalError?.code);
+        // Пробуем резервный метод - прямой запрос через axios
+        try {
+            console.log(`Используем резервный метод для получения профиля пользователя ${telegramId}`);
+            // Важно! Используем полный URL, а не относительный
+            const response = await axios.get(`${backend_URL}/users/${telegramId}`);
+            console.log(`Успешно получен профиль через резервный метод:`, JSON.stringify(response.data).substring(0, 100) + '...');
+            return response.data;
+        } catch (fallbackError) {
+            console.error(`Ошибка резервного метода:`, fallbackError.message);
+            
+            // Проверка на 404 - пользователь не найден
+            if (error.status === 404 || fallbackError.response?.status === 404) {
+                return null; // Пользователь не найден
+            }
+            
+            // Переделываем ошибку наружу для обработки в вызывающем коде
+            throw new Error(`Не удалось получить профиль: ${error.message}`);
         }
-        
-        // Переделываем ошибку наружу для обработки в вызывающем коде
-        throw new Error(`Не удалось получить профиль: ${error.message}`);
     }
 }
 
@@ -142,13 +153,43 @@ const loadWorkerProfile = async (workerObj, ctx) => {
     ctx.session.workerInfo.completedTasks = workerObj.completedTasks;
 }
 
+// Улучшаем функцию updateUserSceneStep для надежности
 const updateUserSceneStep = async (telegramId, scene, step) => {
+    if (!telegramId) {
+        console.error('updateUserSceneStep: telegramId не определен');
+        return false;
+    }
+    
+    console.log(`Обновление сцены для пользователя ${telegramId}: ${scene}, шаг ${step}`);
+    
     try {
-        const response = await apiService.users.updateProfile(telegramId, { scene, step });
+        // Первый метод - через apiService
+        await apiService.users.updateProfile(telegramId, { scene, step });
+        console.log(`Сцена успешно обновлена через apiService для ${telegramId}`);
         return true;
     } catch (error) {
-        console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
-        return false;
+        console.error(`Ошибка при обновлении сцены: ${error.message}`);
+        
+        try {
+            // Второй метод - прямой запрос через axios
+            console.log(`Пробуем обновить сцену напрямую через axios для ${telegramId}`);
+            await axios.patch(`${backend_URL}/users/${telegramId}`, { scene, step });
+            console.log(`Сцена успешно обновлена через axios для ${telegramId}`);
+            return true;
+        } catch (axiosError) {
+            console.error(`Ошибка axios при обновлении сцены: ${axiosError.message}`);
+            
+            // Третий метод - прямой запрос через axios с PUT
+            try {
+                console.log(`Пробуем обновить сцену через PUT для ${telegramId}`);
+                await axios.put(`${backend_URL}/users/${telegramId}`, { scene, step });
+                console.log(`Сцена успешно обновлена через PUT для ${telegramId}`);
+                return true;
+            } catch (putError) {
+                console.error(`Все попытки обновления сцены не удались для ${telegramId}`);
+                return false;
+            }
+        }
     }
 }
 
