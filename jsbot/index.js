@@ -77,7 +77,27 @@ bot.catch((err, ctx) => {
     const chat = ctx.chat;
     console.log(`Пользователь: ${user ? user.id : 'неизвестно'}, Чат: ${chat ? chat.id : 'неизвестно'}`);
     
-    // Отправляем сообщение пользователю
+    // Специальная обработка ошибок HTML-форматирования
+    if (err.description && err.description.includes("can't parse entities")) {
+        console.log('Ошибка HTML-форматирования в сообщении:', err.description);
+        
+        let errorInfo = '';
+        if (err.on && err.on.payload && err.on.payload.text) {
+            // Выводим только часть текста для отладки
+            const textSample = err.on.payload.text.substring(0, 100) + '...';
+            errorInfo = `\nПроблема в тексте: ${textSample}`;
+        }
+        
+        // Отправляем информативное сообщение пользователю
+        try {
+            ctx.reply(`Извините, произошла ошибка форматирования сообщения. Мы исправим это в ближайшее время.${errorInfo}`);
+        } catch (replyError) {
+            console.error('Не удалось отправить сообщение об ошибке:', replyError);
+        }
+        return;
+    }
+    
+    // Стандартное сообщение об ошибке для других случаев
     try {
         ctx.reply('Извините, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.');
     } catch (replyError) {

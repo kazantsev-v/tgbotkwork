@@ -7,6 +7,55 @@ function formatWorkDays(workDays) {
     return workDays.map(day => daysOfWeek.find(d => d.id === day).text).join(', ');
 }
 
+// Функция для правильного форматирования данных о машине
+function formatVehicleData(vehicle) {
+    if (!vehicle) return 'Нет данных';
+    
+    let result = '\n';
+    
+    // Используем простые символы вместо HTML-тегов для списка
+    if (vehicle.length) result += '• Длина: ' + vehicle.length + ' см\n';
+    if (vehicle.width) result += '• Ширина: ' + vehicle.width + ' см\n';
+    if (vehicle.height) result += '• Высота: ' + vehicle.height + ' см\n';
+    if (vehicle.volume) result += '• Объем: ' + vehicle.volume + ' м³\n';
+    if (vehicle.maxWeight) result += '• Макс. вес: ' + vehicle.maxWeight + ' кг\n';
+    if (vehicle.type) result += '• Тип: ' + vehicle.type + '\n';
+    
+    return result;
+}
+
+// Функция для безопасного форматирования профиля пользователя
+function formatProfileMessage(profile) {
+    try {
+        // Форматированное сообщение профиля
+        let message = `<b>${profile.name || 'Имя не указано'}</b>\n`;
+        message += `<b>Станция метро:</b> ${profile.metroStation || '-'}\n`;
+        message += `<b>Реквизиты:</b> ${profile.requisites || '-'}\n`;
+        message += `<b>Телефон:</b> ${profile.phone || '-'}\n`;
+        message += `<b>Баланс:</b> ${profile.balance || 0}\n`;
+        message += `<b>Рабочие дни:</b> ${profile.workingDays || '-'}\n`;
+        message += `<b>Время работы:</b> ${profile.workingHours || '-'}\n`;
+        
+        // Безопасно добавляем поля, которые могут быть undefined
+        if (profile.weeklyIncome !== undefined) 
+            message += `<b>Еженедельный доход:</b> ${profile.weeklyIncome}\n`;
+        if (profile.bonuses !== undefined) 
+            message += `<b>Бонусы:</b> ${profile.bonuses}\n`;
+        if (profile.rating !== undefined) 
+            message += `<b>Рейтинг:</b> ${profile.rating}\n`;
+        
+        // Форматируем данные о машине правильно
+        if (profile.vehicle) {
+            message += `<b>Машина:</b>${formatVehicleData(profile.vehicle)}`;
+        }
+        
+        return message;
+    } catch (error) {
+        console.error('Ошибка при форматировании сообщения профиля:', error);
+        return '<b>Ошибка при генерации профиля</b>\nПожалуйста, попробуйте позже или обратитесь в поддержку.';
+    }
+}
+
 const profileScene = new Scenes.BaseScene('profileScene');
 
 profileScene.enter(async (ctx) => {
@@ -67,15 +116,7 @@ profileScene.enter(async (ctx) => {
             `<b>Бонусы:</b> ${bonus}\n` +
             `<b>Рейтинг:</b> ${rating}\n` +
             `${role==='driver'?
-                '<b>Машина:</b><ul>\n'+
-                '<li>Длина:'+driverInfo.length||'-'+'</li>\n' +
-                '<li>Ширина:'+driverInfo.width||'-'+'</li>\n' +
-                '<li>Высота:'+driverInfo.height||'-'+'</li>\n' +
-                '<li>Объем:'+driverInfo.volume||'-'+'</li>\n' +
-                '<li>Грузоподъемность:'+driverInfo.capacity||'-'+'</li>\n' +
-                '<li>Марка:'+driverInfo.brand||'-'+'</li>\n' +
-                '<li>Кол-во мест:'+driverInfo.availableSpots||'-'+'</li>\n' +
-                + '</ul>\n':
+                '<b>Машина:</b>'+formatVehicleData(driverInfo):
                 ''}` + 
             `${role==='rigger'?'<b>Cвои ремни:</b>' + (hasStraps?'✅':'❌'):''}` + 
             `${role==='dismantler'?'<b>Свой инструмент:</b>' + (hasTools?'✅':'❌'):''}` + 
