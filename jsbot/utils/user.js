@@ -142,12 +142,34 @@ const loadWorkerProfile = async (workerObj, ctx) => {
     ctx.session.workerInfo.completedTasks = workerObj.completedTasks;
 }
 
+// Обновим функцию updateUserSceneStep с обработкой ошибок URL
 async function updateUserSceneStep(telegramId, scene, step) {
+    if (!telegramId) {
+        console.error('updateUserSceneStep: telegramId не определен');
+        return false;
+    }
+    
     try {
+        // Логируем для отладки
+        console.log(`Обновление сцены для пользователя ${telegramId}: сцена=${scene}, шаг=${step}`);
+        
+        // Используем API сервис для обновления профиля
         await apiService.users.updateProfile(telegramId, { scene, step });
         return true;
     } catch (error) {
         console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
+        
+        // Если это ошибка URL, пытаемся использовать старый метод через axios напрямую
+        if (error.message.includes('URL')) {
+            try {
+                console.log(`Падбек: использование прямого вызова через axios для ${telegramId}`);
+                await axios.patch(`${backend_URL}/users/${telegramId}`, { scene, step });
+                return true;
+            } catch (axiosError) {
+                console.error('Ошибка падбека:', axiosError.message);
+            }
+        }
+        
         if (error.isNetworkError || error.isTimeout) {
             console.log(`Ошибка сети при обновлении статуса пользователя. Повторный запрос не выполняется.`);
         }

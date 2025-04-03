@@ -1,12 +1,22 @@
-require('dotenv').config();
-const token = process.env.bot_token;
+const dotenv = require('dotenv');
+const path = require('path');
 
-config = {
-    botToken: token,
-    termsForWorkersLink:"https://law.2gis.ru/licensing-agreement",
-    termsForCustomersLink:"https://law.2gis.ru/licensing-agreement",
-    port: 3013,
-    backendURL: 'https://bot.moverspb.ru:3003/api'
-}
+// Загружаем переменные среды из основного .env файла
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-module.exports = { config };
+const botToken = process.env.BOT_TOKEN;
+const backendURL = process.env.BACKEND_URL || 'https://bot.moverspb.ru:3003/api';
+const apiUrl = backendURL; // Убедимся, что apiUrl имеет тот же URL, что и backendURL
+
+const port = process.env.BOT_PORT || 3013;
+
+// Экспортируем конфигурацию с обоими URL
+exports.config = {
+    botToken,
+    backendURL,
+    apiUrl,
+    port
+};
+
+// Логируем для отладки
+console.log(`Конфигурация бота загружена. API URL: ${apiUrl}`);

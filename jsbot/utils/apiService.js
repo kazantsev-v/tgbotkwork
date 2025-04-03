@@ -7,9 +7,15 @@ const TIMEOUT = parseInt(process.env.HTTP_TIMEOUT) || 30000; // 30 секунд 
 const MAX_RETRIES = 3; // Максимальное количество повторных попыток
 const RETRY_DELAY = 1000; // Задержка между повторными попытками (1 секунда)
 
+// Проверяем, что URL API установлен правильно
+const BASE_URL = config.apiUrl || config.backendURL || process.env.BACKEND_URL || 'https://bot.moverspb.ru:3003/api';
+
+// Вывод информации о том, какой URL используется
+console.log(`API-сервис использует URL: ${BASE_URL}`);
+
 // Создаем экземпляр axios с общими настройками
 const api = axios.create({
-    baseURL: config.apiUrl,
+    baseURL: BASE_URL,
     timeout: TIMEOUT,
     // Игнорируем проблемы с SSL (только для разработки)
     httpsAgent: new https.Agent({
@@ -23,10 +29,34 @@ const api = axios.create({
 // Функция задержки
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Валидация URL перед запросом
+function validateUrl(baseUrl, relativePath) {
+    if (!baseUrl) {
+        throw new Error('API URL не настроен. Проверьте config.apiUrl или BACKEND_URL в .env');
+    }
+    
+    try {
+        // Проверим, что URL валидный
+        const url = new URL(relativePath, baseUrl);
+        return url.toString();
+    } catch (error) {
+        console.error(`Неверный URL: ${baseUrl}${relativePath}`, error.message);
+        throw new Error(`Некорректный URL: ${error.message}`);
+    }
+}
+
 // Обертка для выполнения запросов с повторными попытками и обработкой ошибок
 async function callApi(method, url, data = null, options = {}) {
     const { retries = MAX_RETRIES, retryDelay = RETRY_DELAY } = options;
     let lastError;
+
+    // Проверяем URL перед запросом
+    try {
+        validateUrl(BASE_URL, url);
+    } catch (error) {
+        console.error(`Ошибка валидации URL перед запросом ${method} ${url}:`, error.message);
+        throw error;
+    }
 
     for (let attempt = 0; attempt < retries + 1; attempt++) {
         try {
@@ -104,6 +134,9 @@ function formatError(error) {
 
 // Экспортируем методы для работы с API
 module.exports = {
+    // Добавляем базовый URL для дебага
+    baseUrl: BASE_URL,
+    
     // Общий метод для запросов
     request: callApi,
     
