@@ -143,16 +143,28 @@ async function freePort(port, forceFree = false) {
     }
 }
 
-// Функция для запуска процесса с цветным выводом логов
+// Константы для повторного запуска
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 10000; // 10 секунд
+
+// Переменные для отслеживания перезапусков
+let botRetries = 0;
+let backendRetries = 0;
+let adminRetries = 0;
+
+// Функция для запуска процесса с цветным выводом логов и автоматическим перезапуском
 function startProcess(command, args, cwd, name, color, onError = null) {
     console.log(chalk[color](`Starting ${name}...`));
     
     const process = spawn(command, args, { 
         cwd, 
         shell: true,
-        stdio: ['inherit', 'pipe', 'pipe']
+        stdio: ['inherit', 'pipe', 'pipe'],
+        env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: '0' } // Добавляем для решения проблем с SSL
     });
 
+    let errorBuffer = '';
+    
     process.stdout.on('data', (data) => {
         const lines = data.toString().trim().split('\n');
         lines.forEach(line => {
@@ -162,6 +174,8 @@ function startProcess(command, args, cwd, name, color, onError = null) {
 
     process.stderr.on('data', (data) => {
         const lines = data.toString().trim().split('\n');
+        errorBuffer += data.toString();
+        
         lines.forEach(line => {
             if (line.trim()) console.error(chalk[color].bold(`[${name} ERROR] ${line}`));
         });
@@ -175,22 +189,86 @@ function startProcess(command, args, cwd, name, color, onError = null) {
     process.on('close', (code) => {
         console.log(chalk[color].bold(`[${name}] Process exited with code ${code}`));
         
-        // Если процесс завершился с ошибкой и это бэкенд, предложить запустить его снова
-        if (code !== 0 && name === 'Backend') {
-            rl.question(
-                chalk.yellow('Хотите попробовать запустить бэкенд снова на другом порту? (y/n): '),
-                async (answer) => {
-                    if (answer.toLowerCase() === 'y') {
-                        // Пробуем освободить порт и запустить бэкенд снова
-                        await freePort(BACKEND_PORT, true);
-                        startBackend();
-                    }
+        // Проверяем, нужно ли перезапустить процесс
+        if (code !== 0) {
+            let shouldRestart = false;
+            let retryCount = 0;
+            let retryDelay = RETRY_DELAY;
+            
+            // Определяем стратегию перезапуска в зависимости от типа компонента
+            if (name === 'TG Bot') {
+                retryCount = ++botRetries;
+                // Проверяем ошибки соединения
+                if (errorBuffer.includes('ETIMEDOUT') || 
+                    errorBuffer.includes('ECONNREFUSED') || 
+                    errorBuffer.includes('ECONNRESET') ||
+                    errorBuffer.includes('getaddrinfo') ||
+                    errorBuffer.includes('request failed')) {
+                    shouldRestart = true;
+                    console.log(chalk.yellow(`Обнаружена ошибка сети для ${name}. Будет выполнен перезапуск...`));
                 }
-            );
+            } else if (name === 'Backend') {
+                retryCount = ++backendRetries;
+                // Проверяем ошибки бэкенда
+                if (errorBuffer.includes('EADDRINUSE')) {
+                    shouldRestart = false; // Особый случай, обрабатывается отдельно
+                } else {
+                    shouldRestart = true;
+                }
+            } else if (name === 'Admin Panel') {
+                retryCount = ++adminRetries;
+                shouldRestart = true;
+            }
+            
+            // Если достигнуто максимальное количество попыток, прекращаем перезапуск
+            if (retryCount > MAX_RETRIES) {
+                console.log(chalk.red(`Достигнуто максимальное количество попыток перезапуска для ${name} (${MAX_RETRIES})`));
+                shouldRestart = false;
+            }
+            
+            // Если нужно перезапустить, выполняем перезапуск с задержкой
+            if (shouldRestart) {
+                console.log(chalk[color](`Перезапуск ${name} через ${retryDelay/1000} секунд... (попытка ${retryCount}/${MAX_RETRIES})`));
+                
+                setTimeout(() => {
+                    if (name === 'TG Bot') {
+                        startProcess(command, args, cwd, name, color, onError);
+                    } else if (name === 'Backend') {
+                        startBackend();
+                    } else if (name === 'Admin Panel') {
+                        startProcess(command, args, cwd, name, color, onError);
+                    }
+                }, retryDelay);
+            } else if (name === 'Backend') {
+                // Особая обработка для бэкенда, предлагаем интерактивный выбор
+                rl.question(
+                    chalk.yellow('Хотите попробовать запустить бэкенд снова на другом порту? (y/n): '),
+                    async (answer) => {
+                        if (answer.toLowerCase() === 'y') {
+                            // Пробуем освободить порт и запустить бэкенд снова
+                            await freePort(BACKEND_PORT, true);
+                            startBackend();
+                        }
+                    }
+                );
+            }
         }
     });
 
     return process;
+}
+
+// Обработчик ошибок для бота
+function handleBotError(errorText) {
+    if (errorText.includes('ETIMEDOUT') || 
+        errorText.includes('ECONNREFUSED') || 
+        errorText.includes('ECONNRESET')) {
+        console.log(chalk.yellow('Обнаружена ошибка сети для Telegram Bot. Проверьте интернет-соединение.'));
+    }
+    
+    if (errorText.includes('bot token')) {
+        console.log(chalk.red('Ошибка с токеном бота. Проверьте TOKEN в .env файле.'));
+    }
 }
 
 // Обновляем файл конфигурации бэкенда для нового порта (временное решение)
@@ -285,13 +363,14 @@ function handleBackendError(errorText) {
 
 // Запуск всех компонентов
 async function startAll() {
-    // Запуск телеграм бота
+    // Запуск телеграм бота с обработчиком ошибок
     const botProcess = startProcess(
         'node', 
         ['index.js'], 
         JSBOT_DIR, 
         'TG Bot', 
-        'blue'
+        'blue',
+        handleBotError
     );
 
     // Запуск бэкенда

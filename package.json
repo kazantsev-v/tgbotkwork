@@ -4,9 +4,10 @@
   "description": "Telegram bot project with backend and admin panel",
   "scripts": {
     "start": "node start-all.js",
-    "start:bot": "cd jsbot && node index.js",
+    "start:bot": "cd jsbot && node start-bot.js",
     "start:backend": "cd jsback/dist && node server.js",
-    "start:admin": "cd admin-panel && ng serve --host 0.0.0.0 --ssl true --ssl-cert ./cert.pem --ssl-key ./privkey.pem"
+    "start:admin": "cd admin-panel && ng serve --host 0.0.0.0 --ssl true --ssl-cert ./cert.pem --ssl-key ./privkey.pem",
+    "bot:stable": "cd jsbot && node start-bot.js"
   },
   "dependencies": {
     "chalk": "^4.1.2",
