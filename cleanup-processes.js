@@ -85,16 +85,8 @@ function findProcesses(keyword) {
     return new Promise((resolve, reject) => {
         let command;
         
-        if (isWindows) {
-            command = `tasklist /FI "IMAGENAME eq node.exe" /FO CSV`;
-        } else if (isLinux) {
-            // Для Linux получаем информацию о пользователе, который запустил процесс
-            command = `ps -eo pid,user,command | grep -v grep | grep -i "node"`;
-        } else if (isMac) {
-            command = `ps -e -o pid,user,command | grep -v grep | grep -i "node"`;
-        } else {
-            command = `ps aux | grep -v grep | grep -i "node"`;
-        }
+        // Только Linux/Unix команды
+        command = `ps -eo pid,user,command | grep -v grep | grep -i "node"`;
         
         exec(command, (error, stdout) => {
             if (error) {
@@ -109,37 +101,20 @@ function findProcesses(keyword) {
             
             let processes = [];
             
-            if (isWindows) {
-                // Парсинг вывода tasklist
-                const lines = stdout.trim().split('\n');
-                // Пропускаем заголовок
-                for (let i = 1; i < lines.length; i++) {
-                    const parts = lines[i].replace(/"/g, '').split(',');
-                    if (parts.length >= 2) {
-                        const pid = parseInt(parts[1]);
-                        processes.push({
-                            pid,
-                            command: parts[0],
-                            user: 'Unknown' // В Windows сложнее получить пользователя
-                        });
-                    }
-                }
-            } else {
-                // Парсинг вывода ps для Linux/Unix
-                const lines = stdout.trim().split('\n');
-                for (const line of lines) {
-                    const parts = line.trim().split(/\s+/);
-                    if (parts.length >= 3) {
-                        const pid = parseInt(parts[0]);
-                        const user = parts[1];
-                        const command = parts.slice(2).join(' ');
-                        
-                        processes.push({
-                            pid,
-                            user,
-                            command
-                        });
-                    }
+            // Парсинг вывода ps для Linux/Unix
+            const lines = stdout.trim().split('\n');
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 3) {
+                    const pid = parseInt(parts[0]);
+                    const user = parts[1];
+                    const command = parts.slice(2).join(' ');
+                    
+                    processes.push({
+                        pid,
+                        user,
+                        command
+                    });
                 }
             }
             
@@ -158,65 +133,54 @@ function findProcesses(keyword) {
 // Функция для завершения процесса
 async function killProcess(pid, processInfo) {
     const isCurrentUserProcess = processInfo && processInfo.user === process.env.USER;
-    const needsSudo = !isWindows && !isCurrentUserProcess;
+    const needsSudo = !isCurrentUserProcess;
     
     try {
-        if (isWindows) {
-            // Windows - используем taskkill
-            await executeCommand(`taskkill /F /PID ${pid}`);
-        } else {
-            // Linux/Mac - проверяем нужен ли sudo
-            if (needsSudo) {
-                try {
-                    // Сначала пробуем обычный kill
-                    await executeCommand(`kill -9 ${pid}`);
-                    log(`Процесс ${pid} успешно завершен`);
-                    return true;
-                } catch (error) {
-                    if (error.message.includes('Operation not permitted')) {
-                        log(`Недостаточно прав для завершения процесса ${pid}, попробуем с sudo`);
-                        // Если не хватает прав, спрашиваем пользователя о sudo
-                        return new Promise((resolve) => {
-                            rl.question(`Процесс ${pid} (${processInfo?.command}) принадлежит пользователю ${processInfo?.user}. Использовать sudo? (y/n): `, async (answer) => {
-                                if (answer.toLowerCase() === 'y') {
-                                    try {
-                                        await executeSudo(`kill -9 ${pid}`);
-                                        log(`Процесс ${pid} успешно завершен с sudo`);
-                                        resolve(true);
-                                    } catch (sudoError) {
-                                        log(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, true);
-                                        log(`Вы можете завершить процесс вручную командой: sudo kill -9 ${pid}`, true);
-                                        resolve(false);
-                                    }
-                                } else {
-                                    log(`Пропускаем процесс ${pid}`);
-                                    resolve(false);
-                                }
-                            });
-                        });
-                    } else {
-                        throw error;
-                    }
-                }
-            } else {
-                // Обычный kill для процессов текущего пользователя
+        // Linux/Mac - проверяем нужен ли sudo
+        if (needsSudo) {
+            try {
+                // Сначала пробуем обычный kill
                 await executeCommand(`kill -9 ${pid}`);
                 log(`Процесс ${pid} успешно завершен`);
                 return true;
+            } catch (error) {
+                if (error.message.includes('Operation not permitted')) {
+                    log(`Недостаточно прав для завершения процесса ${pid}, попробуем с sudo`);
+                    // Если не хватает прав, спрашиваем пользователя о sudo
+                    return new Promise((resolve) => {
+                        rl.question(`Процесс ${pid} (${processInfo?.command}) принадлежит пользователю ${processInfo?.user}. Использовать sudo? (y/n): `, async (answer) => {
+                            if (answer.toLowerCase() === 'y') {
+                                try {
+                                    await executeSudo(`kill -9 ${pid}`);
+                                    log(`Процесс ${pid} успешно завершен с sudo`);
+                                    resolve(true);
+                                } catch (sudoError) {
+                                    log(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, true);
+                                    log(`Вы можете завершить процесс вручную командой: sudo kill -9 ${pid}`, true);
+                                    resolve(false);
+                                }
+                            } else {
+                                log(`Пропускаем процесс ${pid}`);
+                                resolve(false);
+                            }
+                        });
+                    });
+                } else {
+                    throw error;
+                }
             }
+        } else {
+            // Обычный kill для процессов текущего пользователя
+            await executeCommand(`kill -9 ${pid}`);
+            log(`Процесс ${pid} успешно завершен`);
+            return true;
         }
-        
-        return true;
     } catch (error) {
         log(`Ошибка при завершении процесса ${pid}: ${error.message}`, true);
         
         if (error.message.includes('Operation not permitted') || error.message.includes('Access is denied')) {
             log(`Недостаточно прав для завершения процесса. Команда для ручного завершения:`, true);
-            if (isWindows) {
-                log(`Запустите командную строку от имени администратора и выполните: taskkill /F /PID ${pid}`, true);
-            } else {
-                log(`sudo kill -9 ${pid}`, true);
-            }
+            log(`sudo kill -9 ${pid}`, true);
         }
         
         return false;
@@ -239,13 +203,7 @@ function executeCommand(command) {
 // Вспомогательная функция для получения PID процесса по порту
 function getProcessIdByPort(port) {
     return new Promise((resolve, reject) => {
-        let command;
-        
-        if (isWindows) {
-            command = `netstat -ano | findstr :${port}`;
-        } else {
-            command = `lsof -i :${port} | grep LISTEN`;
-        }
+        const command = `lsof -i :${port} | grep LISTEN`;
         
         exec(command, (error, stdout) => {
             if (error) {
@@ -256,7 +214,7 @@ function getProcessIdByPort(port) {
             const lines = stdout.trim().split('\n');
             if (lines.length > 0) {
                 const parts = lines[0].trim().split(/\s+/);
-                const pid = isWindows ? parts[parts.length - 1] : parts[1];
+                const pid = parts[1];
                 resolve(pid);
             } else {
                 resolve(null);

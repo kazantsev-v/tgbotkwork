@@ -6,6 +6,10 @@ const readline = require('readline');
 const net = require('net');
 const dotenv = require('dotenv');
 
+// Определение платформы
+const isWindows = process.platform === 'win32';
+const isLinux = process.platform === 'linux';
+
 // Загрузка переменных окружения
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -40,13 +44,11 @@ function isPortInUse(port) {
     });
 }
 
-// Функция для получения ID процесса, использующего порт (Unix/Linux)
+// Функция для получения ID процесса, использующего порт
 function getProcessIdByPort(port) {
     return new Promise((resolve, reject) => {
-        const isWindows = process.platform === 'win32';
-        const command = isWindows
-            ? `netstat -ano | findstr :${port}`
-            : `lsof -i :${port} -t`;
+        // Только UNIX/Linux команда
+        const command = `lsof -i :${port} -t`;
 
         exec(command, (error, stdout) => {
             if (error) {
@@ -55,25 +57,13 @@ function getProcessIdByPort(port) {
                 return;
             }
 
-            if (isWindows) {
-                // Парсинг вывода Windows netstat
-                const lines = stdout.trim().split('\n');
-                if (lines.length > 0) {
-                    const line = lines[0];
-                    const parts = line.trim().split(/\s+/);
-                    if (parts.length >= 5) {
-                        resolve(parts[4]);
-                        return;
-                    }
-                }
-            } else {
-                // Парсинг вывода Unix lsof
-                const pid = stdout.trim().split('\n')[0];
-                if (pid) {
-                    resolve(pid);
-                    return;
-                }
+            // Парсинг вывода UNIX lsof
+            const pid = stdout.trim().split('\n')[0];
+            if (pid) {
+                resolve(pid);
+                return;
             }
+            
             resolve(null);
         });
     });
@@ -95,8 +85,8 @@ async function freePort(port, forceFree = false) {
     if (forceFree) {
         // Автоматическое освобождение порта
         try {
-            const isWindows = process.platform === 'win32';
-            const command = isWindows ? `taskkill /F /PID ${pid}` : `kill -9 ${pid}`;
+            // Только Linux команда для kill
+            const command = `kill -9 ${pid}`;
             
             await new Promise((resolve, reject) => {
                 exec(command, (error) => {
@@ -122,8 +112,8 @@ async function freePort(port, forceFree = false) {
                 chalk.yellow(`Порт ${port} занят процессом ${pid}. Завершить процесс? (y/n): `),
                 (answer) => {
                     if (answer.toLowerCase() === 'y') {
-                        const isWindows = process.platform === 'win32';
-                        const command = isWindows ? `taskkill /F /PID ${pid}` : `kill -9 ${pid}`;
+                        // Только Linux команда для kill
+                        const command = `kill -9 ${pid}`;
                         
                         exec(command, (error) => {
                             if (error) {
@@ -483,9 +473,8 @@ async function startAdminPanel() {
 function startAngularProcess(port) {
     logWithTime(`Starting Admin Panel on port ${port}...`, 'yellow');
     
-    // Используем spawn для запуска процесса Angular CLI,
-    // но с определенными параметрами чтобы избежать интерактивного ввода
-    const command = isWindows ? 'npx.cmd' : 'npx';
+    // В Linux всегда используем 'npx'
+    const command = 'npx';
     
     // Используем полную командную строку для обхода проблем с аргументами Angular CLI
     const cmdString = `ng serve --host 0.0.0.0 --ssl true --ssl-cert ./cert.pem --ssl-key ./privkey.pem --port ${port} --disable-host-check --no-live-reload`;
