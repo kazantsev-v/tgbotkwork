@@ -1,8 +1,17 @@
 jsbot/node_modules/
 *.sqlite
-.env  // .env уже добавлен здесь
+# Игнорирование всех .env файлов в проекте
+.env
+**/.env
+jsbot/.env
+# Игнорирование секретных файлов
 jsbot/cert.pem
+jsbot/privkey.pem
 jsbot/prevkey.pem
+# Логи
 jsbot/logs/
 logs/
 *.log
+# Временные файлы
+.DS_Store
+.tmp
