@@ -6,9 +6,6 @@ const readline = require('readline');
 const net = require('net');
 const dotenv = require('dotenv');
 
-// Импортируем функцию cleanup из модуля
-const { cleanup } = require('./cleanup-processes');
-
 // Определение платформы
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
@@ -33,41 +30,6 @@ const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
-
-// Функция для автоматической очистки перед запуском
-async function cleanupBeforeStart() {
-    logWithTime('Автоматическая очистка процессов перед запуском...', 'yellow');
-    
-    try {
-        // Запускаем внешний процесс cleanup с флагами для автоматического и неинтерактивного режима
-        await new Promise((resolve) => {
-            const cleanupProcess = spawn('node', ['cleanup-processes.js', '--auto-kill', '--non-interactive'], {
-                stdio: 'inherit'
-            });
-            
-            // Устанавливаем таймаут для защиты от зависания
-            const timeoutId = setTimeout(() => {
-                logWithTime('Превышено время ожидания очистки, продолжаем запуск...', 'yellow');
-                if (cleanupProcess && !cleanupProcess.killed) {
-                    try {
-                        cleanupProcess.kill();
-                    } catch (err) {
-                        console.error('Ошибка при завершении процесса очистки:', err);
-                    }
-                }
-                resolve();
-            }, 60000); // 1 минута максимум на очистку
-            
-            cleanupProcess.on('close', (code) => {
-                clearTimeout(timeoutId);
-                logWithTime(`Очистка завершена с кодом ${code}`, 'green');
-                resolve();
-            });
-        });
-    } catch (error) {
-        logWithTime(`Ошибка при очистке: ${error.message}`, 'red');
-    }
-}
 
 // Функция для проверки занятости порта
 function isPortInUse(port) {
@@ -636,9 +598,6 @@ function startAngularProcess(port) {
 
 // Запуск всех компонентов
 async function startAll() {
-    // Сначала очищаем все процессы
-    await cleanupBeforeStart();
-    
     // Создаем файл с PID основного процесса
     fs.writeFileSync(path.join(__dirname, 'main-process.pid'), process.pid.toString());
     
