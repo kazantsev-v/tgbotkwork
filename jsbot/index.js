@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 const { config } = require('./config/config');
 
 const newUserMiddleware = require('./middlewares/newUserMiddleware');
+const errorHandlingMiddleware = require('./middlewares/errorHandlingMiddleware');
 
 process.env.NODE_ENV = 'development';
 
@@ -28,14 +29,16 @@ const stage = new Scenes.Stage(Object.values(scenes));
 bot.use(session());
 bot.use(stage.middleware());
 
+// Добавляем middleware для обработки ошибок
+bot.use(errorHandlingMiddleware);
+bot.use(newUserMiddleware);
+
 bot.use((ctx, next) => {
     if (ctx.session.currentScene) {
         ctx.scene.enter(ctx.session.currentScene);
     }
     return next();
 });
-
-bot.use(newUserMiddleware);
 
 bot.command('start', async (ctx) => {
     await ctx.scene.enter('welcomeScene');

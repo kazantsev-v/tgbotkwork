@@ -7,6 +7,10 @@ const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
 const isMac = process.platform === 'darwin';
 
+// Предустановленный пароль для sudo
+const SUDO_PASSWORD = 'yD8eY9nZ4z';
+const AUTO_KILL = process.argv.includes('--auto-kill');
+
 // Создаем интерфейс для чтения ввода пользователя
 const rl = readline.createInterface({
     input: process.stdin,
@@ -39,43 +43,39 @@ function log(message, isError = false) {
     }
 }
 
-// Функция для выполнения команды как sudo
+// Функция для выполнения команды как sudo с автоматическим вводом пароля
 function executeSudo(command) {
     return new Promise((resolve, reject) => {
-        // Сначала пробуем использовать sudo с -S для ввода пароля
-        log(`Требуются повышенные привилегии. Выполняем: sudo ${command}`);
+        log(`Выполнение sudo команды: ${command}`);
         
-        console.log('Введите пароль sudo (не будет отображаться):');
-        rl.question('', (password) => {
-            const sudoProcess = require('child_process').spawn('sudo', ['-S'].concat(command.split(' ')), {
-                stdio: ['pipe', 'pipe', 'pipe']
-            });
-            
-            // Отправляем пароль в stdin
-            sudoProcess.stdin.write(password + '\n');
-            sudoProcess.stdin.end();
-            
-            let output = '';
-            sudoProcess.stdout.on('data', (data) => {
-                output += data.toString();
-            });
-            
-            let errorOutput = '';
-            sudoProcess.stderr.on('data', (data) => {
-                errorOutput += data.toString();
-                // Не выводим сообщение о запросе пароля
-                if (!errorOutput.includes('password')) {
-                    process.stderr.write(data);
-                }
-            });
-            
-            sudoProcess.on('close', (code) => {
-                if (code === 0) {
-                    resolve(output);
-                } else {
-                    reject(new Error(`Выполнение sudo команды завершилось с кодом ${code}: ${errorOutput}`));
-                }
-            });
+        const sudoProcess = require('child_process').spawn('sudo', ['-S'].concat(command.split(' ')), {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        // Отправляем пароль в stdin
+        sudoProcess.stdin.write(SUDO_PASSWORD + '\n');
+        sudoProcess.stdin.end();
+        
+        let output = '';
+        sudoProcess.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+        
+        let errorOutput = '';
+        sudoProcess.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+            // Не выводим сообщение о запросе пароля
+            if (!errorOutput.includes('password')) {
+                process.stderr.write(data);
+            }
+        });
+        
+        sudoProcess.on('close', (code) => {
+            if (code === 0) {
+                resolve(output);
+            } else {
+                reject(new Error(`Выполнение sudo команды завершилось с кодом ${code}: ${errorOutput}`));
+            }
         });
     });
 }
@@ -145,26 +145,38 @@ async function killProcess(pid, processInfo) {
                 return true;
             } catch (error) {
                 if (error.message.includes('Operation not permitted')) {
-                    log(`Недостаточно прав для завершения процесса ${pid}, попробуем с sudo`);
-                    // Если не хватает прав, спрашиваем пользователя о sudo
-                    return new Promise((resolve) => {
-                        rl.question(`Процесс ${pid} (${processInfo?.command}) принадлежит пользователю ${processInfo?.user}. Использовать sudo? (y/n): `, async (answer) => {
-                            if (answer.toLowerCase() === 'y') {
-                                try {
-                                    await executeSudo(`kill -9 ${pid}`);
-                                    log(`Процесс ${pid} успешно завершен с sudo`);
-                                    resolve(true);
-                                } catch (sudoError) {
-                                    log(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, true);
-                                    log(`Вы можете завершить процесс вручную командой: sudo kill -9 ${pid}`, true);
+                    log(`Недостаточно прав для завершения процесса ${pid}, используем sudo`);
+                    
+                    // Если включен автоматический режим, используем sudo без запроса
+                    if (AUTO_KILL) {
+                        try {
+                            await executeSudo(`kill -9 ${pid}`);
+                            log(`Процесс ${pid} успешно завершен с sudo`);
+                            return true;
+                        } catch (sudoError) {
+                            log(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, true);
+                            return false;
+                        }
+                    } else {
+                        // Если не автоматический режим, спрашиваем пользователя
+                        return new Promise((resolve) => {
+                            rl.question(`Процесс ${pid} (${processInfo?.command}) принадлежит пользователю ${processInfo?.user}. Использовать sudo? (y/n): `, async (answer) => {
+                                if (answer.toLowerCase() === 'y') {
+                                    try {
+                                        await executeSudo(`kill -9 ${pid}`);
+                                        log(`Процесс ${pid} успешно завершен с sudo`);
+                                        resolve(true);
+                                    } catch (sudoError) {
+                                        log(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, true);
+                                        resolve(false);
+                                    }
+                                } else {
+                                    log(`Пропускаем процесс ${pid}`);
                                     resolve(false);
                                 }
-                            } else {
-                                log(`Пропускаем процесс ${pid}`);
-                                resolve(false);
-                            }
+                            });
                         });
-                    });
+                    }
                 } else {
                     throw error;
                 }
@@ -325,5 +337,10 @@ async function cleanup() {
     }
 }
 
-// Запуск очистки
-cleanup();
+// Экспортируем функцию для использования в других модулях
+module.exports = { cleanup };
+
+// Если файл запущен напрямую, выполняем очистку
+if (require.main === module) {
+    cleanup();
+}

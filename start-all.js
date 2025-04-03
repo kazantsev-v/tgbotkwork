@@ -6,6 +6,9 @@ const readline = require('readline');
 const net = require('net');
 const dotenv = require('dotenv');
 
+// Импортируем функцию cleanup из модуля
+const { cleanup } = require('./cleanup-processes');
+
 // Определение платформы
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
@@ -30,6 +33,27 @@ const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
+
+// Функция для автоматической очистки перед запуском
+async function cleanupBeforeStart() {
+    logWithTime('Автоматическая очистка процессов перед запуском...', 'yellow');
+    
+    try {
+        // Запускаем внешний процесс cleanup с флагом --auto-kill
+        await new Promise((resolve) => {
+            const cleanupProcess = spawn('node', ['cleanup-processes.js', '--auto-kill'], {
+                stdio: 'inherit'
+            });
+            
+            cleanupProcess.on('close', () => {
+                logWithTime('Очистка завершена', 'green');
+                resolve();
+            });
+        });
+    } catch (error) {
+        logWithTime(`Ошибка при очистке: ${error.message}`, 'red');
+    }
+}
 
 // Функция для проверки занятости порта
 function isPortInUse(port) {
@@ -67,6 +91,45 @@ function getProcessIdByPort(port) {
             resolve(null);
         });
     });
+}
+
+// Функция для автоматического освобождения порта без запроса подтверждения
+async function forceKillPortProcess(port) {
+    const pid = await getProcessIdByPort(port);
+    if (!pid) {
+        logWithTime(`Порт ${port} занят, но не удалось определить процесс.`, 'yellow');
+        return false;
+    }
+    
+    try {
+        const command = `kill -9 ${pid}`;
+        await new Promise((resolve) => {
+            exec(command, (error) => {
+                if (error) {
+                    logWithTime(`Не удалось завершить процесс ${pid}, пробуем с sudo`, 'yellow');
+                    // Пробуем с sudo
+                    exec(`echo "yD8eY9nZ4z" | sudo -S kill -9 ${pid}`, (sudoError) => {
+                        if (sudoError) {
+                            logWithTime(`Не удалось завершить процесс ${pid} с sudo: ${sudoError.message}`, 'red');
+                            resolve(false);
+                        } else {
+                            logWithTime(`Процесс ${pid} успешно завершен с sudo`, 'green');
+                            resolve(true);
+                        }
+                    });
+                } else {
+                    logWithTime(`Процесс ${pid} успешно завершен, порт ${port} освобожден.`, 'green');
+                    resolve(true);
+                }
+            });
+        });
+        
+        // Проверяем, освободился ли порт
+        return !(await isPortInUse(port));
+    } catch (error) {
+        logWithTime(`Ошибка при освобождении порта ${port}: ${error.message}`, 'red');
+        return false;
+    }
 }
 
 // Функция для освобождения порта
@@ -559,10 +622,21 @@ function startAngularProcess(port) {
 
 // Запуск всех компонентов
 async function startAll() {
+    // Сначала очищаем все процессы
+    await cleanupBeforeStart();
+    
     // Создаем файл с PID основного процесса
     fs.writeFileSync(path.join(__dirname, 'main-process.pid'), process.pid.toString());
     
     logWithTime(`Основной процесс запущен с PID: ${process.pid}`, 'magenta');
+    
+    // Проверяем и освобождаем порты принудительно
+    for (const port of [BACKEND_PORT, BOT_PORT, ADMIN_PORT]) {
+        if (await isPortInUse(port)) {
+            logWithTime(`Порт ${port} занят. Автоматическое освобождение...`, 'yellow');
+            await forceKillPortProcess(port);
+        }
+    }
     
     // Запуск телеграм бота с обработчиком ошибок
     const botProcess = startProcess(

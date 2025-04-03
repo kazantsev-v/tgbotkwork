@@ -59,75 +59,128 @@ function formatProfileMessage(profile) {
 const profileScene = new Scenes.BaseScene('profileScene');
 
 profileScene.enter(async (ctx) => {
-    await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
-    const role = ctx.session.role;
-    const isCustomer = ctx.session.role === 'customer'; // Проверяем роль
-    const userProfile = isCustomer ? ctx.session.customerInfo : ctx.session.workerInfo; // Получаем профиль из сессии
-
-    if (userProfile.photo) {
-        console.log(userProfile)
-        if (!userProfile.photo.startsWith("http")) {
-            await ctx.replyWithPhoto(userProfile.photo);
-        } else {
-            pics = String(userProfile.photo).replace(/^http:/, "https:");
-            await ctx.replyWithPhoto({ url: pics});
+    try {
+        await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
+        const role = ctx.session.role;
+        const isCustomer = ctx.session.role === 'customer'; // Проверяем роль
+        
+        // Проверка на существование профиля
+        if (!ctx.session.customerInfo && !ctx.session.workerInfo) {
+            await ctx.reply('Ваш профиль недоступен. Возможно, произошла ошибка в системе. Пожалуйста, попробуйте позже.');
+            await ctx.scene.enter('mainScene');
+            return;
         }
-    }
+        
+        const userProfile = isCustomer ? ctx.session.customerInfo : ctx.session.workerInfo; // Получаем профиль из сессии
 
-    if (isCustomer) {
-        const { fullName, companyName, phone, additionalContacts, companyDetailsDoc } = userProfile;
-
-
-        await ctx.replyWithHTML(
-            `<b>${fullName}</b>\n` +
-            `<b>Компания:</b> ${companyName || '-'}\n` +
-            `<b>Телефон:</b> ${phone}\n` +
-            `<b>Доп. контакты:</b> ${additionalContacts || '-'}\n` +
-            `<b>Баланс:</b> ${ctx.session.balance}\n` +
-            `<b>Платежные данные:</b> ${companyDetailsDoc.startsWith("http")?'<a href="'+companyDetailsDoc+'">скачать документ</a>':companyDetailsDoc}\n`
-        );
-        if(companyDetailsDoc.startsWith("http")) {
-            await ctx.replyWithHTML(
-                `<b>Платежные данные:</b>`
-            );
-            await ctx.replyWithDocument({ url: companyDetailsDoc });
-        } else {
-            await ctx.replyWithHTML(
-                `<b>Платежные данные:</b>\n${companyDetailsDoc}`
-            );
+        // Проверяем, существует ли фото в профиле
+        if (userProfile && userProfile.photo) {
+            try {
+                if (!userProfile.photo.startsWith("http")) {
+                    await ctx.replyWithPhoto(userProfile.photo);
+                } else {
+                    pics = String(userProfile.photo).replace(/^http:/, "https:");
+                    await ctx.replyWithPhoto({ url: pics });
+                }
+            } catch (photoError) {
+                console.error(`Ошибка при отправке фото пользователя: ${photoError.message}`);
+                await ctx.reply('Фото не удалось загрузить.');
+            }
         }
 
-        await ctx.reply('Что вы хотите сделать?', Markup.keyboard([
-            ['Изменить данные'], 
-            ['Пополнить баланс','Назад']
-        ]).resize());
-    } else {
-        // Генерация профиля для рабочих
-        const { fullName, metroStation, paymentDetails, phone, workDays, startTime, endTime, weeklyIncome, driverInfo, rating, hasStraps, hasTools, hasFurnitureTools, workInRegion, bonus } = userProfile;
-        await ctx.replyWithHTML(
-            `<b>${fullName}</b>\n` +
-            `<b>Станция метро:</b> ${metroStation || '-'}\n` +
-            `<b>Реквизиты:</b> ${paymentDetails || '-'}\n` +
-            `<b>Телефон:</b> ${phone}\n` +
-            `<b>Баланс:</b> ${ctx.session.balance}\n` +
-            `<b>Рабочие дни:</b> ${workDays ? formatWorkDays(workDays) : '-'}\n` +
-            `<b>Время работы:</b> ${startTime || '--'}:00 - ${endTime || '--'}:00\n` +
-            `<b>Еженедельный доход:</b> ${weeklyIncome}\n` + 
-            `<b>Бонусы:</b> ${bonus}\n` +
-            `<b>Рейтинг:</b> ${rating}\n` +
-            `${role==='driver'?
-                '<b>Машина:</b>'+formatVehicleData(driverInfo):
-                ''}` + 
-            `${role==='rigger'?'<b>Cвои ремни:</b>' + (hasStraps?'✅':'❌'):''}` + 
-            `${role==='dismantler'?'<b>Свой инструмент:</b>' + (hasTools?'✅':'❌'):''}` + 
-            `${role==='loader'?'<b>Свой инструмент:</b>' + (hasFurnitureTools?'✅':'❌'):''}` + 
-            `${role==='handyman'?'<b>Работа в области:</b>' + (workInRegion?'✅':'❌'):''}`
-        );
+        if (isCustomer) {
+            // Обработка для клиента с проверкой полей
+            if (!userProfile) {
+                await ctx.reply('Профиль клиента не найден. Пожалуйста, попробуйте позже.');
+                await ctx.scene.enter('mainScene');
+                return;
+            }
 
-        await ctx.reply('Что вы хотите сделать?', Markup.keyboard([
-            ['Моя статистика', 'Изменить данные'],
-            ['Назад']
-        ]).resize());
+            const { fullName, companyName, phone, additionalContacts, companyDetailsDoc } = userProfile;
+
+            // Создаем сообщение с безопасными проверками
+            let message = `<b>${fullName || 'Имя не указано'}</b>\n` +
+                `<b>Компания:</b> ${companyName || '-'}\n` +
+                `<b>Телефон:</b> ${phone || '-'}\n` +
+                `<b>Доп. контакты:</b> ${additionalContacts || '-'}\n` +
+                `<b>Баланс:</b> ${ctx.session.balance || 0}\n`;
+
+            if (companyDetailsDoc) {
+                if (companyDetailsDoc.startsWith("http")) {
+                    message += `<b>Платежные данные:</b> <a href="${companyDetailsDoc}">скачать документ</a>\n`;
+                } else {
+                    message += `<b>Платежные данные:</b> ${companyDetailsDoc}\n`;
+                }
+            } else {
+                message += `<b>Платежные данные:</b> Не указаны\n`;
+            }
+
+            await ctx.replyWithHTML(message);
+
+            if (companyDetailsDoc && companyDetailsDoc.startsWith("http")) {
+                try {
+                    await ctx.replyWithHTML(`<b>Платежные данные:</b>`);
+                    await ctx.replyWithDocument({ url: companyDetailsDoc });
+                } catch (docError) {
+                    console.error(`Ошибка при отправке документа: ${docError.message}`);
+                    await ctx.reply('Не удалось отправить документ с платежными данными.');
+                }
+            } else if (companyDetailsDoc) {
+                await ctx.replyWithHTML(`<b>Платежные данные:</b>\n${companyDetailsDoc}`);
+            }
+
+            await ctx.reply('Что вы хотите сделать?', Markup.keyboard([
+                ['Изменить данные'], 
+                ['Пополнить баланс','Назад']
+            ]).resize());
+        } else {
+            // Обработка для рабочих
+            if (!userProfile) {
+                await ctx.reply('Профиль работника не найден. Пожалуйста, попробуйте позже.');
+                await ctx.scene.enter('mainScene');
+                return;
+            }
+
+            const { fullName, metroStation, paymentDetails, phone, workDays, startTime, endTime, 
+                   weeklyIncome, driverInfo, rating, hasStraps, hasTools, hasFurnitureTools, 
+                   workInRegion, bonus } = userProfile;
+
+            // Сформируем сообщение с безопасными проверками всех полей
+            let message = `<b>${fullName || 'Имя не указано'}</b>\n` +
+                `<b>Станция метро:</b> ${metroStation || '-'}\n` +
+                `<b>Реквизиты:</b> ${paymentDetails || '-'}\n` +
+                `<b>Телефон:</b> ${phone || '-'}\n` +
+                `<b>Баланс:</b> ${ctx.session.balance || 0}\n` +
+                `<b>Рабочие дни:</b> ${workDays ? formatWorkDays(workDays) : '-'}\n` +
+                `<b>Время работы:</b> ${startTime || '--'}:00 - ${endTime || '--'}:00\n` +
+                `<b>Еженедельный доход:</b> ${weeklyIncome || '-'}\n` +
+                `<b>Бонусы:</b> ${bonus || '-'}\n` +
+                `<b>Рейтинг:</b> ${rating || '-'}\n`;
+
+            // Добавляем информацию в зависимости от роли с дополнительными проверками
+            if (role === 'driver' && driverInfo) {
+                message += `<b>Машина:</b>${formatVehicleData(driverInfo)}`;
+            } else if (role === 'rigger') {
+                message += `<b>Cвои ремни:</b> ${hasStraps ? '✅' : '❌'}\n`;
+            } else if (role === 'dismantler') {
+                message += `<b>Свой инструмент:</b> ${hasTools ? '✅' : '❌'}\n`;
+            } else if (role === 'loader') {
+                message += `<b>Свой инструмент:</b> ${hasFurnitureTools ? '✅' : '❌'}\n`;
+            } else if (role === 'handyman') {
+                message += `<b>Работа в области:</b> ${workInRegion ? '✅' : '❌'}\n`;
+            }
+
+            await ctx.replyWithHTML(message);
+
+            await ctx.reply('Что вы хотите сделать?', Markup.keyboard([
+                ['Моя статистика', 'Изменить данные'],
+                ['Назад']
+            ]).resize());
+        }
+    } catch (error) {
+        console.error(`Ошибка в profileScene.enter: ${error.message}`);
+        await ctx.reply('Произошла ошибка при загрузке профиля. Пожалуйста, попробуйте позже.');
+        await ctx.scene.enter('mainScene');
     }
 });
 

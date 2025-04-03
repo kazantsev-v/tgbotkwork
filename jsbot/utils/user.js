@@ -5,6 +5,7 @@ const FormData = require('form-data');
 const { User, Worker, Customer } = require("../models/user");
 const { config } = require('../config/config');
 const { catchAxiosError } = require('./errors');
+const apiService = require('./apiService');
 
 const backend_URL = config.backendURL;
 
@@ -40,13 +41,23 @@ const saveWorkerUser = async (worker) => {
     }
 }
 
-const getUsersProfile = async (telegramId) => {
+async function getUsersProfile(telegramId) {
     try {
-        const response = await axios.get(`${backend_URL}/users/${telegramId}`);
-        return response.data; // Возвращаем данные профиля
+        const profile = await apiService.users.getProfile(telegramId);
+        return profile;
     } catch (error) {
-        catchAxiosError(error);
+        console.error(`Ошибка при получении профиля пользователя ${telegramId}:`, error.message);
+        // Можно обработать разные типы ошибок
+        if (error.status === 404) {
+            return null; // Пользователь не найден
+        }
         
+        if (error.isNetworkError) {
+            console.error('Сетевая ошибка при запросе к API:', error.originalError?.code);
+        }
+        
+        // Переделываем ошибку наружу для обработки в вызывающем коде
+        throw new Error(`Не удалось получить профиль: ${error.message}`);
     }
 }
 
@@ -131,21 +142,18 @@ const loadWorkerProfile = async (workerObj, ctx) => {
     ctx.session.workerInfo.completedTasks = workerObj.completedTasks;
 }
 
-const updateUserSceneStep = async (telegramId, scene, step, ctx) => {
-    if(ctx && ctx.step)
-        ctx.session.step = step;
+async function updateUserSceneStep(telegramId, scene, step) {
     try {
-        const response = await axios.patch(`${backend_URL}/users/updateSceneStep/${telegramId}`, {
-            scene,
-            step,
-        });
-
-        return response.data; // Возвращаем обновленного пользователя
+        await apiService.users.updateProfile(telegramId, { scene, step });
+        return true;
     } catch (error) {
-        catchAxiosError(error);
-        
+        console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
+        if (error.isNetworkError || error.isTimeout) {
+            console.log(`Ошибка сети при обновлении статуса пользователя. Повторный запрос не выполняется.`);
+        }
+        return false;
     }
-};
+}
 
 const updateUserBalance = async (telegramId, balance, ctx) => {
     if(ctx && ctx.session)
@@ -161,6 +169,26 @@ const updateUserBalance = async (telegramId, balance, ctx) => {
         
     }
 };
+
+async function safeLoadUserProfile(telegramId, ctx) {
+    try {
+        const profile = await getUsersProfile(telegramId);
+        if (!profile) {
+            await ctx.reply('Ваш профиль не найден. Пожалуйста, начните общение с /start');
+            return false;
+        }
+        
+        // Обновите контекст сессии полученными данными
+        ctx.session.userId = profile.id;
+        ctx.session.role = profile.role;
+        
+        return profile;
+    } catch (error) {
+        console.error(`Ошибка загрузки профиля: ${error.message}`);
+        await ctx.reply('Произошла ошибка при загрузке вашего профиля. Пожалуйста, попробуйте позже.');
+        return false;
+    }
+}
 
 module.exports = {
     saveCustomerUser,
