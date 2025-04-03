@@ -7,12 +7,9 @@ const TIMEOUT = parseInt(process.env.HTTP_TIMEOUT) || 30000; // 30 секунд 
 const MAX_RETRIES = 3; // Максимальное количество повторных попыток
 const RETRY_DELAY = 1000; // Задержка между повторными попытками (1 секунда)
 
-// Получаем базовый URL из конфигурации
-const BASE_URL = config.backendURL;
-
 // Создаем экземпляр axios с общими настройками
 const api = axios.create({
-    baseURL: BASE_URL,
+    baseURL: config.backendURL,
     timeout: TIMEOUT,
     // Игнорируем проблемы с SSL (только для разработки)
     httpsAgent: new https.Agent({
@@ -26,35 +23,10 @@ const api = axios.create({
 // Функция задержки
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Безопасный метод для работы с URL
-function safeJoinUrl(base, endpoint) {
-    try {
-        if (!base) {
-            console.error('Базовый URL не установлен');
-            return endpoint;
-        }
-        
-        // Убираем / в конце базового URL
-        const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
-        
-        // Добавляем / в начало endpoint, если его нет
-        const cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
-        
-        return cleanBase + cleanEndpoint;
-    } catch (error) {
-        console.error(`Ошибка при формировании URL: ${error.message}`);
-        return base + '/' + endpoint;
-    }
-}
-
 // Обертка для выполнения запросов с повторными попытками и обработкой ошибок
 async function callApi(method, url, data = null, options = {}) {
     const { retries = MAX_RETRIES, retryDelay = RETRY_DELAY } = options;
     let lastError;
-
-    // Пробуем сформировать полный URL для логирования
-    const fullUrl = safeJoinUrl(BASE_URL, url);
-    console.log(`Выполняется запрос: ${method.toUpperCase()} ${fullUrl}`);
 
     for (let attempt = 0; attempt < retries + 1; attempt++) {
         try {
@@ -74,9 +46,6 @@ async function callApi(method, url, data = null, options = {}) {
         } catch (error) {
             lastError = error;
             
-            // Проверяем, есть ли у ошибки свойство config для доступа к данным запроса
-            const errorConfig = error.config || {};
-            
             // Подробное логирование ошибки
             console.error(`API ошибка (попытка ${attempt + 1}/${retries + 1}) для ${method} ${url}:`, {
                 message: error.message,
@@ -84,18 +53,12 @@ async function callApi(method, url, data = null, options = {}) {
                 status: error.response?.status,
                 data: error.response?.data,
                 config: {
-                    url: errorConfig.url,
-                    method: errorConfig.method,
-                    data: errorConfig.data,
-                    headers: errorConfig.headers
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    data: error.config?.data,
+                    headers: error.config?.headers
                 }
             });
-
-            // Если ошибка связана с недопустимым URL, перехватываем ее
-            if (error.message && error.message.includes('Invalid URL') || error.code === 'ERR_INVALID_URL') {
-                console.error(`Недопустимый URL: ${fullUrl}. Проверьте настройки URL в config или переменные окружения.`);
-                throw new Error(`Недопустимый URL при запросе к ${url}. Проверьте настройки конфигурации API.`);
-            }
 
             // Если это не последняя попытка, и ошибка подходит для повторной попытки
             if (attempt < retries && shouldRetry(error)) {

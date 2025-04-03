@@ -142,35 +142,12 @@ const loadWorkerProfile = async (workerObj, ctx) => {
     ctx.session.workerInfo.completedTasks = workerObj.completedTasks;
 }
 
-// Модифицируем функцию updateUserSceneStep с улучшенной обработкой ошибок URL
-async function updateUserSceneStep(telegramId, scene, step) {
-    if (!telegramId) {
-        console.error('updateUserSceneStep: telegramId не определен');
-        return false;
-    }
-    
+const updateUserSceneStep = async (telegramId, scene, step) => {
     try {
-        // Используем API сервис для обновления профиля
-        await apiService.users.updateProfile(telegramId, { scene, step });
+        const response = await apiService.users.updateProfile(telegramId, { scene, step });
         return true;
     } catch (error) {
         console.error(`Ошибка при обновлении сцены пользователя ${telegramId}:`, error.message);
-        
-        // Защита от ошибок URL - пробуем запасной вариант через прямой axios запрос
-        if (error.message.includes('URL') || error.message.includes('Invalid')) {
-            try {
-                console.log(`Резервный путь: использование axios для обновления сцены пользователя ${telegramId}`);
-                await axios.patch(`${backend_URL}/users/${telegramId}`, { scene, step });
-                console.log(`Успешное обновление через резервный путь`);
-                return true;
-            } catch (fallbackError) {
-                console.error(`Ошибка резервного пути: ${fallbackError.message}`);
-            }
-        }
-        
-        if (error.isNetworkError || error.isTimeout) {
-            console.log(`Ошибка сети при обновлении статуса пользователя. Повторный запрос не выполняется.`);
-        }
         return false;
     }
 }
@@ -189,26 +166,6 @@ const updateUserBalance = async (telegramId, balance, ctx) => {
         
     }
 };
-
-async function safeLoadUserProfile(telegramId, ctx) {
-    try {
-        const profile = await getUsersProfile(telegramId);
-        if (!profile) {
-            await ctx.reply('Ваш профиль не найден. Пожалуйста, начните общение с /start');
-            return false;
-        }
-        
-        // Обновите контекст сессии полученными данными
-        ctx.session.userId = profile.id;
-        ctx.session.role = profile.role;
-        
-        return profile;
-    } catch (error) {
-        console.error(`Ошибка загрузки профиля: ${error.message}`);
-        await ctx.reply('Произошла ошибка при загрузке вашего профиля. Пожалуйста, попробуйте позже.');
-        return false;
-    }
-}
 
 module.exports = {
     saveCustomerUser,
