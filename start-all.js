@@ -45,8 +45,22 @@ async function cleanupBeforeStart() {
                 stdio: 'inherit'
             });
             
-            cleanupProcess.on('close', () => {
-                logWithTime('Очистка завершена', 'green');
+            // Устанавливаем таймаут для защиты от зависания
+            const timeoutId = setTimeout(() => {
+                logWithTime('Превышено время ожидания очистки, продолжаем запуск...', 'yellow');
+                if (cleanupProcess && !cleanupProcess.killed) {
+                    try {
+                        cleanupProcess.kill();
+                    } catch (err) {
+                        console.error('Ошибка при завершении процесса очистки:', err);
+                    }
+                }
+                resolve();
+            }, 60000); // 1 минута максимум на очистку
+            
+            cleanupProcess.on('close', (code) => {
+                clearTimeout(timeoutId);
+                logWithTime(`Очистка завершена с кодом ${code}`, 'green');
                 resolve();
             });
         });

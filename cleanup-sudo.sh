@@ -23,6 +23,7 @@ done
 
 # Запускаем скрипт очистки в автоматическом режиме (с флагом для неинтерактивного режима)
 echo "Запуск скрипта очистки..."
-node "$SCRIPT_DIR/cleanup-processes.js" --auto-kill --non-interactive
+# Добавляем таймаут для автоматического завершения, если скрипт зависнет
+timeout 2m node "$SCRIPT_DIR/cleanup-processes.js" --auto-kill --non-interactive || echo "Скрипт очистки завершен по таймауту"
 
 echo "Очистка завершена!"
