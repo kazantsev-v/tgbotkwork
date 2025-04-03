@@ -22,17 +22,18 @@ function startBot() {
     log('Starting Telegram Bot...');
     
     // Добавляем NODE_OPTIONS для увеличения таймаутов
-    process.env.NODE_OPTIONS = '--dns-result-order=ipv4first --http-parser=legacy --tls-min-v1.0';
+    const nodeEnv = { 
+        ...process.env,
+        NODE_OPTIONS: '--dns-result-order=ipv4first --http-parser=legacy --tls-min-v1.0',
+        NODE_TLS_REJECT_UNAUTHORIZED: '0', // Игнорировать проблемы с SSL
+        HTTP_TIMEOUT: '60000', // 60 секунд таймаут для HTTP запросов
+        HTTPS_TIMEOUT: '60000' // 60 секунд таймаут для HTTPS запросов
+    };
     
     const botProcess = spawn('node', ['index.js'], { 
         cwd: __dirname,
         stdio: 'inherit',
-        env: {
-            ...process.env,
-            NODE_TLS_REJECT_UNAUTHORIZED: '0', // Игнорировать проблемы с SSL
-            HTTP_TIMEOUT: '60000', // 60 секунд таймаут для HTTP запросов
-            HTTPS_TIMEOUT: '60000' // 60 секунд таймаут для HTTPS запросов
-        }
+        env: nodeEnv
     });
 
     botProcess.on('close', (code) => {

@@ -156,7 +156,7 @@ let adminRetries = 0;
 function startProcess(command, args, cwd, name, color, onError = null) {
     console.log(chalk[color](`Starting ${name}...`));
     
-    const process = spawn(command, args, { 
+    const childProcess = spawn(command, args, { 
         cwd, 
         shell: true,
         stdio: ['inherit', 'pipe', 'pipe'],
@@ -165,14 +165,14 @@ function startProcess(command, args, cwd, name, color, onError = null) {
 
     let errorBuffer = '';
     
-    process.stdout.on('data', (data) => {
+    childProcess.stdout.on('data', (data) => {
         const lines = data.toString().trim().split('\n');
         lines.forEach(line => {
             if (line.trim()) console.log(chalk[color](`[${name}] ${line}`));
         });
     });
 
-    process.stderr.on('data', (data) => {
+    childProcess.stderr.on('data', (data) => {
         const lines = data.toString().trim().split('\n');
         errorBuffer += data.toString();
         
@@ -186,7 +186,7 @@ function startProcess(command, args, cwd, name, color, onError = null) {
         }
     });
 
-    process.on('close', (code) => {
+    childProcess.on('close', (code) => {
         console.log(chalk[color].bold(`[${name}] Process exited with code ${code}`));
         
         // Проверяем, нужно ли перезапустить процесс
@@ -255,7 +255,7 @@ function startProcess(command, args, cwd, name, color, onError = null) {
         }
     });
 
-    return process;
+    return childProcess;
 }
 
 // Обработчик ошибок для бота
