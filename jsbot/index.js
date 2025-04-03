@@ -68,6 +68,34 @@ httpsServer.listen(config.port, () => {
 
 bot.launch();
 
+// Добавляем глобальный обработчик ошибок
+bot.catch((err, ctx) => {
+    console.error(`Ошибка при обработке обновления ${ctx.update.update_id}:`, err);
+    
+    // Логируем контекст сообщения для отладки
+    const user = ctx.from;
+    const chat = ctx.chat;
+    console.log(`Пользователь: ${user ? user.id : 'неизвестно'}, Чат: ${chat ? chat.id : 'неизвестно'}`);
+    
+    // Отправляем сообщение пользователю
+    try {
+        ctx.reply('Извините, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.');
+    } catch (replyError) {
+        console.error('Не удалось отправить сообщение об ошибке:', replyError);
+    }
+});
+
+// Обработчик непойманных ошибок в промисах
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Непойманная ошибка в промисе:', reason);
+});
+
+// Обработчик непойманных исключений
+process.on('uncaughtException', (error) => {
+    console.error('Непойманное исключение:', error);
+    // Не завершаем процесс, чтобы бот продолжал работать
+});
+
 // Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))

@@ -3,3 +3,6 @@ jsbot/node_modules/
 .env
 jsbot/cert.pem
 jsbot/prevkey.pem
+jsbot/logs/
+logs/
+*.log

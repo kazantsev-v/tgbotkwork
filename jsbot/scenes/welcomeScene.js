@@ -64,7 +64,7 @@ welcomeScene.enter(async (ctx) => {
 
     const profile = await getUsersProfile(ctx.from.id);
 
-    if (profile.role != 'moderator') {
+    if (profile && profile.role !== 'moderator') {
         ctx.session.telegramId = ctx.from.id;
         const welcomeText = `
         Ищете работу?
@@ -84,6 +84,13 @@ welcomeScene.enter(async (ctx) => {
             ctx.session.scene = 'roleSelectionScene';
             ctx.scene.enter('roleSelectionScene');
         });
+    } else {
+        ctx.reply('Добро пожаловать! Ваш профиль еще не создан или вы являетесь модератором.');
+        try {
+            console.log(`Попытка создания профиля для пользователя ${ctx.from.id}`);
+        } catch (error) {
+            console.error(`Ошибка при создании профиля: ${error.message}`);
+        }
     }
 });
 
