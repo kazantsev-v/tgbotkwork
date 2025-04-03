@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "Telegram bot project with backend and admin panel",
   "scripts": {
-    "start": "node start-all.js"
+    "start": "node start-all.js",
+    "start:bot": "cd jsbot && node index.js",
+    "start:backend": "cd jsback/dist && node server.js",
+    "start:admin": "cd admin-panel && ng serve --host 0.0.0.0 --ssl true --ssl-cert ./cert.pem --ssl-key ./privkey.pem"
   },
   "dependencies": {
+    "chalk": "^4.1.2",
     "concurrently": "^8.2.2",
-    "chalk": "^4.1.2"
+    "dotenv": "^16.4.7"
   }
 }
