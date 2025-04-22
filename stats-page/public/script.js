@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const topIncomeList = document.getElementById('top-income-list');
     const topRatingList = document.getElementById('top-rating-list');
-    // Укажите URL вашего бэкенда. Замените на актуальный URL, если он отличается.
     const backendUrl = 'https://bot.moverspb.ru:3003/api/users/workers-stats';
 
     async function fetchWorkerStats() {
@@ -23,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderList(listElement, workers, statType) {
-        listElement.innerHTML = ''; // Очистить сообщение "Загрузка..."
+        listElement.innerHTML = '';
 
         if (!workers || workers.length === 0) {
             listElement.innerHTML = '<li class="loading">Нет данных для отображения.</li>';
@@ -38,10 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
             rankSpan.textContent = `${worker.rank}.`;
 
             const img = document.createElement('img');
-            // Предполагаем, что worker.photo содержит полный URL к фото
-            img.src = worker.photo || 'placeholder.png'; // Добавьте файл placeholder.png в папку public на случай отсутствия фото
+            img.src = worker.photo || 'placeholder.png'; 
             img.alt = worker.name;
-            img.onerror = () => { img.src = 'placeholder.png'; }; // Запасное изображение при ошибке
+            img.onerror = () => { img.src = 'placeholder.png'; }; 
 
             const infoDiv = document.createElement('div');
             infoDiv.className = 'worker-info';
@@ -70,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
             infoDiv.appendChild(nameSpan);
             infoDiv.appendChild(roleSpan);
             infoDiv.appendChild(statSpan);
-            infoDiv.appendChild(tasksSpan); // Добавляем задачи
+            infoDiv.appendChild(tasksSpan);
 
             listItem.appendChild(rankSpan);
             listItem.appendChild(img);
