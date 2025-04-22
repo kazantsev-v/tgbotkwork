@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 
 const app = express();
-const port = 3001; // Убедитесь, что этот порт не занят вашим основным бэкендом
+const port = 3005; // Убедитесь, что этот порт не занят вашим основным бэкендом
 
 // Отдаем статические файлы из папки 'public'
 app.use(express.static(path.join(__dirname, 'public')));
