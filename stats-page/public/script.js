@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const topIncomeList = document.getElementById('top-income-list');
     const topRatingList = document.getElementById('top-rating-list');
     // Укажите URL вашего бэкенда. Замените на актуальный URL, если он отличается.
-    const backendUrl = 'http://localhost:3000/api/users/workers-stats';
+    const backendUrl = 'https://bot.moverspb.ru:3003/api/users/workers-stats';
 
     async function fetchWorkerStats() {
         try {
