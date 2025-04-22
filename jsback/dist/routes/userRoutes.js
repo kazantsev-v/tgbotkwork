@@ -17,6 +17,48 @@ router.get("/", async (req, res) => {
     const users = await userRepo.find();
     res.json(users);
 });
+// Новый эндпоинт для получения статистики работников
+router.get("/workers-stats", async (req, res) => {
+    try {
+        const workerRepo = database_1.AppDataSource.getRepository(user_1.Worker);
+        // Получаем всех работников
+        const workers = await workerRepo.find({
+            relations: ["user"]
+        });
+        // Фильтруем только активных работников (есть user и фото) и сортируем
+        const activeWorkers = workers.filter(w => w.user && w.user.photo);
+        // Сортировка по доходу за неделю (в убывающем порядке)
+        const topByIncome = [...activeWorkers].sort((a, b) => b.weeklyIncome - a.weeklyIncome).slice(0, 10);
+        // Сортировка по рейтингу (в убывающем порядке)
+        const topByRating = [...activeWorkers].sort((a, b) => b.rating - a.rating).slice(0, 10);
+        // Форматируем ответ
+        const formattedResponse = {
+            topByIncome: topByIncome.map((worker, index) => ({
+                rank: index + 1,
+                id: worker.user.telegramId,
+                name: worker.user.name,
+                photo: worker.user.photo,
+                role: worker.user.role,
+                income: worker.weeklyIncome,
+                completedTasks: worker.completedTasks || 0 // Добавим кол-во выполненных задач
+            })),
+            topByRating: topByRating.map((worker, index) => ({
+                rank: index + 1,
+                id: worker.user.telegramId,
+                name: worker.user.name,
+                photo: worker.user.photo,
+                role: worker.user.role,
+                rating: worker.rating,
+                completedTasks: worker.completedTasks || 0 // Добавим кол-во выполненных задач
+            }))
+        };
+        res.json(formattedResponse);
+    }
+    catch (error) {
+        console.error("Error fetching worker stats:", error);
+        res.status(500).json({ error: "Failed to fetch worker statistics" });
+    }
+});
 // Получение всех customers
 router.get("/customer", async (req, res) => {
     const customerRepo = database_1.AppDataSource.getRepository(user_1.Customer);

@@ -1,0 +1,123 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f0f4f8; /* Светло-голубой фон */
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #005a9e; /* Темно-синий */
+    margin-bottom: 30px;
+}
+
+h2 {
+    color: #0078d4; /* Ярко-синий */
+    border-bottom: 2px solid #0078d4;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.stats-columns {
+    display: flex;
+    gap: 30px; /* Пространство между колонками */
+    flex-wrap: wrap; /* Перенос колонок на маленьких экранах */
+}
+
+.column {
+    flex: 1; /* Колонки занимают равное пространство */
+    min-width: 300px; /* Минимальная ширина колонки */
+    background-color: #e6f2ff; /* Очень светло-синий фон для колонки */
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+}
+
+.worker-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.worker-list li {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 10px;
+    background-color: #fff;
+    border-radius: 4px;
+    border: 1px solid #cce0ff; /* Светло-синяя рамка */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.worker-list li:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 120, 212, 0.1);
+}
+
+.worker-list .rank {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #005a9e;
+    margin-right: 15px;
+    min-width: 25px; /* Для выравнивания */
+    text-align: right;
+}
+
+.worker-list img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+    object-fit: cover; /* Масштабирование фото */
+    border: 2px solid #0078d4;
+}
+
+.worker-info {
+    flex-grow: 1;
+}
+
+.worker-info .name {
+    font-weight: bold;
+    color: #1a1a1a;
+    margin-bottom: 3px;
+    display: block;
+}
+
+.worker-info .role,
+.worker-info .stat {
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 3px;
+    display: block;
+}
+
+.worker-info .stat strong {
+    color: #0078d4;
+}
+
+.loading {
+    text-align: center;
+    color: #777;
+    padding: 20px;
+    font-style: italic;
+    background-color: transparent !important; /* Убрать фон у загрузки */
+    border: none !important; /* Убрать рамку у загрузки */
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .stats-columns {
+        flex-direction: column; /* Колонки друг под другом */
+    }
+}
