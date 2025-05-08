@@ -19,7 +19,8 @@ function formatDate(date) {
 async function loadTasks(ctx) {
     if(!ctx?.session) throw Error('no session/context in loadTask function');
     const tasks = await getTasksByExecutorId(ctx.session.userId);
-    if(!tasks.length) return [];
+    // Добавляем проверку на случай, если tasks === undefined или null
+    if(!tasks || !tasks.length) return [];
     tasks.map(async task => {
         const photos = await getPhotosByTaskId(task.id);
         return {task, photos};
