@@ -225,3 +225,4 @@ module.exports = {
     updateUserSceneStep,
     initUser,
     updateUserBalance
+};
