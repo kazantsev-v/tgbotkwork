@@ -260,25 +260,20 @@ async function finishTaskCreation(ctx) {
 }
 
 async function createRemindersForTask(ctx, task) {
-    /*const reminders = [];
-    const user = await getUsersProfile(ctx.session.telegramId);
-    const startDate = new Date(findEarliestDate(task.dates));
-    for(let i = 0; i < 6; i++) {
-        const reminderDate = new Date(startDate.getTime() - i * 30 * 60 * 1000);
-        reminders.push(new Reminder(
-            null,
-            user,
-            `Ваше задание начинается через ${(i > 1) ? Math.ceil(i/2) + 'ч':''} ${i*30%60} минут. Вы готовы выйти?`,
-            reminderDate
-        ))
-    }
-    reminders.forEach(async reminder => {
-        try {
+    try {
+        const user = await getUsersProfile(ctx.session.telegramId);
+        // Находим самую раннюю дату выполнения
+        const earliest = new Date(findEarliestDate(task.dates));
+        // Создаем напоминания за 30, 60, 90, 120, 150 и 180 минут до начала
+        for (let i = 1; i <= 6; i++) {
+            const remindAt = new Date(earliest.getTime() - i * 30 * 60 * 1000).toISOString();
+            const message = `Ваше задание "${task.title}" начинается через ${i*30} минут. Вы готовы выйти?`;
+            const reminder = new Reminder(null, user, message, remindAt);
             await createReminder(reminder);
-        } catch (err) {
-            console.error(err);
         }
-    }) */
+    } catch (error) {
+        console.error('Ошибка создания напоминаний:', error);
+    }
 }
 
 function generateOptionsKeyboard() {

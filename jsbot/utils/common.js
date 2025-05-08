@@ -125,7 +125,17 @@ const createReminder = async (reminder) => {
     } catch (error) {
         console.error('Error saving reminder:', catchAxiosError(error));
         return;
-        
+    }
+}
+
+// Добавляем функцию для получения напоминаний
+const getReminders = async (userId) => {
+    try {
+        const response = await axios.get(`${backend_URL}/reminders?userId=${userId}`);
+        return response.data.reminders;
+    } catch (error) {
+        console.error('Error fetching reminders:', catchAxiosError(error));
+        throw new Error('Не удалось загрузить напоминания');
     }
 }
 
@@ -137,5 +147,6 @@ module.exports = {
     saveDocument,
     convertTimeToDbFormat,
     createReminder,
-    tryGetMetroStation
+    tryGetMetroStation,
+    getReminders
 }
