@@ -53,17 +53,25 @@ async function getUsersProfile(telegramId) {
         // Пробуем резервный метод - прямой запрос через axios
         try {
             console.log(`Используем резервный метод для получения профиля пользователя ${telegramId}`);
-            // Важно! Используем полный URL, а не относительный
-            
+            // Используем полный URL
+            const fallbackResponse = await axios.get(`${backend_URL}/users/${telegramId}`, {
+                headers: { 'Cache-Control': 'no-cache' }
+            });
+            return fallbackResponse.data;
         } catch (fallbackError) {
             console.error(`Ошибка резервного метода:`, fallbackError.message);
             
             // Проверка на 404 - пользователь не найден
-            if (error.status === 404 || fallbackError.response?.status === 404) {
+            if (error.response?.status === 404 || fallbackError.response?.status === 404) {
                 return null; // Пользователь не найден
             }
             
-            // Переделываем ошибку наружу для обработки в вызывающем коде
+            // Если ошибка не связана с отсутствием пользователя, пытаемся извлечь максимум информации
+            if (fallbackError.response?.data) {
+                return fallbackError.response.data; // Возвращаем данные, если они есть
+            }
+            
+            // Перебрасываем ошибку наружу для обработки в вызывающем коде
             throw new Error(`Не удалось получить профиль: ${error.message}`);
         }
     }
@@ -217,4 +225,3 @@ module.exports = {
     updateUserSceneStep,
     initUser,
     updateUserBalance
-}
