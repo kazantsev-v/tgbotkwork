@@ -27,7 +27,7 @@ termsScene.action('accept_terms', async (ctx) => {
         await ctx.scene.enter('registrationScene');
     } catch (error) {
         console.error('Ошибка при обработке принятия условий:', error);
-        await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз.');
+        await ctx.reply(error);
     }
 });
 
