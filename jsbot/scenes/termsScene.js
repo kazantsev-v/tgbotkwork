@@ -10,7 +10,10 @@ termsScene.enter(async (ctx) => {
         reply_markup: {
             inline_keyboard: [
                 [
-                    // Корректная кнопка с callback_data
+                    Markup.button.webApp(
+                        'Лицензионное соглашение',
+                        'https://moverspb.ru/agreement/'
+                    ),
                     { text: 'Принять', callback_data: 'accept_terms' }
                 ]
             ]
