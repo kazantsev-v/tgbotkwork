@@ -124,7 +124,7 @@ module.exports = {
     // Методы для работы с пользователями
     users: {
         getProfile: (telegramId) => callApi('get', `users/${telegramId}`),
-        updateProfile: (telegramId, data) => callApi('patch', `updateSceneStep/${telegramId}`, data), // Обновляем сцену через корректный эндпоинт
+        updateProfile: (telegramId, data) => callApi('patch', `users/${telegramId}`, data), // Меняем PUT на PATCH
         createProfile: (data) => callApi('post', 'users', data)
     },
     

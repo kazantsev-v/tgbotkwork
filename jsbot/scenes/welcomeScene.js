@@ -43,16 +43,16 @@ welcomeScene.enter(async (ctx) => {
                 const customerProfile = await getCustomerProfile(ctx.from.id);
                 await loadCustomerProfile(customerProfile, ctx);
                 console.log(customerProfile);
-                // Перенаправляем сразу в главное меню
-                return ctx.scene.enter('mainScene');
+                ctx.scene.enter(ctx.session.scene || 'mainScene');
+                return;
             } else if (
                 /worker|driver|rigger|dismantler|loader|handyman/.test(profile.role)
             ) {
                 const workerProfile = await getWorkerProfile(ctx.from.id);
                 await loadWorkerProfile(workerProfile, ctx);
                 console.log(workerProfile);
-                // Перенаправляем сразу в главное меню
-                return ctx.scene.enter('mainScene');
+                ctx.scene.enter(ctx.session.scene || 'mainScene');
+                return;
             }
         } else {
             console.log(`Профиль не найден, создаем новый для пользователя ${ctx.from.id}`);
@@ -112,9 +112,7 @@ welcomeScene.enter(async (ctx) => {
 
 welcomeScene.action('welcome_proceed', async (ctx) => {
     ctx.session.scene = 'roleSelectionScene';
-    // Обновляем шаг и переходим в сцену выбора роли
-    await updateUserSceneStep(ctx.from.id, 'roleSelectionScene', ctx.session.step || 0);
-    return ctx.scene.enter('roleSelectionScene');
+    ctx.scene.enter('roleSelectionScene');
 });
 
 module.exports = welcomeScene;
