@@ -2,7 +2,9 @@ const { Scenes, Markup } = require('telegraf');
 const { 
     validateNumericValue, 
     validateIntegerValue, 
-    validateText 
+    validateText,
+    validateSBP,
+    validateCardNumber
 } = require('../utils/validators');
 const { message } = require('telegraf/filters');
 const { Customer, Worker } = require('../models/user');
@@ -77,11 +79,11 @@ roleInfoScene.enter(async (ctx) => {
         case 'customer':
             await updateStep(
                 ctx,
-                'paymentTerms',
-                'Выберите вариант взаиморасчета:', 
-                Markup.inlineKeyboard([
-                    Markup.button.callback('С НДС', 'with_vat'),
-                    Markup.button.callback('Без НДС', 'without_vat')
+                'paymentMethod',
+                'Выберите реквизит для оплаты:', 
+                Markup.keyboard([
+                    Markup.button.callback('СБП', 'sbp'),
+                    Markup.button.callback('Номер Карты', 'card'),
                 ])
             )
             break;
@@ -239,6 +241,53 @@ roleInfoScene.on(message('text'), async (ctx) => {
                 await ctx.reply('Ошибка при сохранении пользователя.');
             }
             ctx.scene.enter('mainScene');
+            break;
+        case 'paymentMethod':
+            if (text === 'СБП') {
+                await updateStep(
+                    ctx, 
+                    'sbpNumber',
+                    'Введите номер телефона, привязанный к СБП:'
+                );
+            } else if (text === 'Номер Карты') {
+                await updateStep(
+                    ctx, 
+                    'cardNumber',
+                    'Введите номер карты:'
+                );
+            }
+            break;
+        case 'sbpNumber':
+            if (validateSBP(text)) {
+                ctx.session.customerInfo.companyDetailsDoc = `СБП: ${text}`;
+                await updateStep(
+                    ctx, 
+                    'paymentTerms',
+                    'Выберите форму оплаты:',
+                    Markup.inlineKeyboard([
+                        Markup.button.callback('С НДС', 'with_vat'),
+                        Markup.button.callback('Без НДС', 'without_vat')
+                    ])
+                );
+            } else {
+                await ctx.reply('Некорректный номер телефона для СБП. Введите в формате +7ХХХХХХХХХХ или 8ХХХХХХХХХХ');
+            }
+            break;
+        case 'cardNumber':
+            if (validateCardNumber(text)) {
+                ctx.session.customerInfo.companyDetailsDoc = `Карта: ${text}`;
+                await updateStep(
+                    ctx, 
+                    'paymentTerms',
+                    'Выберите форму оплаты:',
+                    Markup.inlineKeyboard([
+                        Markup.button.callback('С НДС', 'with_vat'),
+                        Markup.button.callback('Без НДС', 'without_vat')
+                    ])
+                );
+            } else {
+                await ctx.reply('Введите корректный номер карты (16 цифр).');
+            }
             break;
         default:
             await ctx.reply('Некорректный ввод. Пожалуйста, попробуйте еще раз.');

@@ -37,10 +37,11 @@ const workerInfoScene = new Scenes.BaseScene('workerInfoScene');
 
     workerInfoScene.on(message('text'), async (ctx, next) => {
         console.log('in text handler');
+        const text = ctx.message.text;
         switch (ctx.session.step) {
             case 'fullName':
-                if(validateFullName(ctx.message.text)) {
-                    ctx.session.workerInfo.fullName = ctx.message.text;
+                if(validateFullName(text)) {
+                    ctx.session.workerInfo.fullName = text;
                     ctx.session.step = 'geolocation';
                     await ctx.reply('Предоставьте местоположение', 
                         Markup.keyboard([
@@ -55,53 +56,77 @@ const workerInfoScene = new Scenes.BaseScene('workerInfoScene');
                 }
                 break;
             case 'geolocation':
-                if(ctx.message.text === '📎Прикрепить геопозицию') {
+                if(text === '📎Прикрепить геопозицию') {
                     await ctx.reply('🌍Пожалуйста, отправьте геопозицию. 📎Прикрепить → 🌍Геопозиция', Markup.removeKeyboard());
-                } else if(ctx.message.text === '🚊Выбрать ближайшую станцию метро:') {
+                } else if(text === '🚊Выбрать ближайшую станцию метро:') {
                     await ctx.reply('Выберите ближайшую станцию метро:', 
                         Markup.inlineKeyboard(
                             metro_stations.map(station => [Markup.button.callback(station, `metro_${station}`)])
                         )
                     );
-                } else if(ctx.message.text === '✍🏻Ввести адрес вручную') {
+                } else if(text === '✍🏻Ввести адрес вручную') {
                     ctx.session.step = 'direct_address';
                     await ctx.reply('Введите адрес:', Markup.removeKeyboard());
                 }
                 break;
             case 'direct_address':
-                ctx.session.workerInfo.address = ctx.message.text;
-                ctx.session.workerInfo.location = null;
-                ctx.session.workerInfo.metroStation = null;
-                ctx.session.step = 'paymentDetails';
-                await ctx.reply('Выберите реквизит для оплаты', 
+                ctx.session.workerInfo.address = text;
+                await updateStep(
+                    ctx, 
+                    'paymentMethod',
+                    'Выберите реквизит для оплаты:', 
                     Markup.keyboard([
-                        Markup.button.callback('СПБ', 'm_location'),
-                        Markup.button.callback('Номер Карты', 'direct_location'),
+                        Markup.button.callback('СБП', 'sbp'),
+                        Markup.button.callback('Номер Карты', 'card'),
                     ])
                 );
                 break;
-            case 'paymentDetails':
-                if(ctx.message.text === 'СПБ') {
-                    await ctx.reply('Введите номер телефона для СБП:');
-                } else if(ctx.message.text === 'Номер Карты') {
-                    await ctx.reply('Введите номер карты:');
+            case 'paymentMethod':
+                if (text === 'СБП') {
+                    await updateStep(
+                        ctx, 
+                        'sbpNumber',
+                        'Введите номер телефона, привязанный к СБП:'
+                    );
+                } else if (text === 'Номер Карты') {
+                    await updateStep(
+                        ctx, 
+                        'cardNumber',
+                        'Введите номер карты:'
+                    );
                 }
-                ctx.session.step = 'paymentFinish';
                 break;
-            case 'paymentFinish':
-                if (validateCardNumber(ctx.message.text) || validateSBP(ctx.message.text)) {
-                    ctx.session.workerInfo.paymentDetails = ctx.message.text;
-                    ctx.session.step = 'photo';
-                    await ctx.reply('Отправьте фото:');
+            case 'sbpNumber':
+                if (validateSBP(text)) {
+                    ctx.session.workerInfo.paymentDetails = `СБП: ${text}`;
+                    await updateStep(
+                        ctx, 
+                        'startTime',
+                        'Укажите время начала работы:', 
+                        await generateTimeKeyboard()
+                    );
                 } else {
-                    await ctx.reply('Неверный формат данны.');
+                    await ctx.reply('Некорректный номер телефона для СБП. Введите в формате +7ХХХХХХХХХХ или 8ХХХХХХХХХХ');
+                }
+                break;
+            case 'cardNumber':
+                if (validateCardNumber(text)) {
+                    ctx.session.workerInfo.paymentDetails = `Карта: ${text}`;
+                    await updateStep(
+                        ctx, 
+                        'startTime',
+                        'Укажите время начала работы:', 
+                        await generateTimeKeyboard()
+                    );
+                } else {
+                    await ctx.reply('Введите корректный номер карты (16 цифр).');
                 }
                 break;
             case 'photo':
                 await ctx.reply('Пожалуйста, отправьте фото.');
                 break;
             case 'workHours':
-                ctx.session.workerInfo.workHours = ctx.message.text;
+                ctx.session.workerInfo.workHours = text;
                 ctx.session.step = 'phone';
                 await ctx.reply('Предоставьте номер телефона', 
                     Markup.keyboard([
@@ -111,7 +136,7 @@ const workerInfoScene = new Scenes.BaseScene('workerInfoScene');
                 );
                 break;
             case 'phone':
-                const phone = ctx.message.text;
+                const phone = text;
                 if (validatePhone(phone)) {
                     ctx.session.workerInfo.phone = phone;
                     console.log(ctx.session.workerInfo);

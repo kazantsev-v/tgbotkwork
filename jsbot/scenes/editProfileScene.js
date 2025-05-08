@@ -115,6 +115,17 @@ editProfileScene.action(/^edit_(.+)$/, async (ctx) => {
                     Markup.button.callback('📎Прикрепить геопозицию', 'g_location'),
                 ]));
             break;
+        case 'paymentDetails':
+            await updateStep(
+                ctx, 
+                'paymentMethod', 
+                'Выберите реквизит для оплаты:', 
+                Markup.keyboard([
+                    Markup.button.callback('СБП', 'sbp'),
+                    Markup.button.callback('Номер Карты', 'card'),
+                ])
+            );
+            break;
         default:
             ctx.scene.state.awaitingInput = true;
             await ctx.reply(
@@ -134,6 +145,59 @@ editProfileScene.on(message('text'), async (ctx) => {
     if (ctx.message.text === 'Назад') {
         await ctx.scene.enter('profileScene');
         return ctx.scene.reenter();
+    }
+
+    // Обработка выбора метода оплаты
+    if (ctx.session.step === 'paymentMethod') {
+        if (ctx.message.text === 'СБП') {
+            await updateStep(
+                ctx, 
+                'sbpNumber',
+                'Введите номер телефона, привязанный к СБП:'
+            );
+            return;
+        } else if (ctx.message.text === 'Номер Карты') {
+            await updateStep(
+                ctx, 
+                'cardNumber',
+                'Введите номер карты:'
+            );
+            return;
+        }
+    }
+    
+    // Обработка ввода СБП номера
+    if (ctx.session.step === 'sbpNumber') {
+        if (validateSBP(ctx.message.text)) {
+            ctx.session.workerInfo.paymentDetails = `СБП: ${ctx.message.text}`;
+            await updateStep(
+                ctx, 
+                'choose',
+                'Реквизиты для оплаты успешно обновлены.'
+            );
+            ctx.scene.state.awaitingInput = false;
+            return ctx.scene.reenter();
+        } else {
+            await ctx.reply('Некорректный номер телефона для СБП. Введите в формате +7ХХХХХХХХХХ или 8ХХХХХХХХХХ');
+            return;
+        }
+    }
+    
+    // Обработка ввода номера карты
+    if (ctx.session.step === 'cardNumber') {
+        if (validateCardNumber(ctx.message.text)) {
+            ctx.session.workerInfo.paymentDetails = `Карта: ${ctx.message.text}`;
+            await updateStep(
+                ctx, 
+                'choose',
+                'Реквизиты для оплаты успешно обновлены.'
+            );
+            ctx.scene.state.awaitingInput = false;
+            return ctx.scene.reenter();
+        } else {
+            await ctx.reply('Введите корректный номер карты (16 цифр).');
+            return;
+        }
     }
 
     if (ctx.message.text === '📎Прикрепить геопозицию') {

@@ -20,13 +20,13 @@ function validateCardNumber(cardNumber) {
 
 // Проверка СБП (телефон или email)
 function validateSBP(details) {
-    const phonePattern = /^\+?\d{10,15}$/; // Телефон с 10-15 цифрами
-    return phonePattern.test(details);
+    return validatePhone(details);
 }
 
 function validatePhone(phone) {
-    const phoneRegex = /^[+]?[0-9]{10,15}$/;
-    return phoneRegex.test(phone);
+    // Проверка российского телефона в формате +7XXXXXXXXXX или 8XXXXXXXXXX
+    const cleanedPhone = phone.replace(/\D/g, '');
+    return /^(7|8)\d{10}$/.test(cleanedPhone);
 }
 
 function validateNumericValue(value) {
