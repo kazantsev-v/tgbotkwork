@@ -71,12 +71,37 @@ bot.use((ctx, next) => {
 bot.command('start', async (ctx) => {
     console.log(`Получена команда /start от пользователя ${ctx.from.id}`);
     try {
-        // Сбрасываем сессию для чистого старта
-        ctx.session = { 
-            telegramId: ctx.from.id,
-            step: 0
-        };
-        await ctx.scene.enter('welcomeScene');
+        // Проверяем, существует ли пользователь в базе данных
+        const profile = await getUsersProfile(ctx.from.id);
+        
+        if (profile) {
+            console.log(`Найден существующий профиль для пользователя ${ctx.from.id}`);
+            // Сохраняем важные данные из профиля, но не сбрасываем сессию полностью
+            ctx.session = ctx.session || {};
+            ctx.session.telegramId = ctx.from.id;
+            ctx.session.userId = profile.id;
+            
+            if (profile.scene) {
+                ctx.session.scene = profile.scene;
+            }
+            
+            if (profile.step !== undefined) {
+                ctx.session.step = profile.step;
+            } else {
+                ctx.session.step = 0;
+            }
+            
+            // Переходим на welcomeScene, которая выполнит правильную маршрутизацию
+            await ctx.scene.enter('welcomeScene');
+        } else {
+            console.log(`Профиль не найден для пользователя ${ctx.from.id}, начинаем регистрацию`);
+            // Сбрасываем сессию для нового пользователя
+            ctx.session = { 
+                telegramId: ctx.from.id,
+                step: 0
+            };
+            await ctx.scene.enter('welcomeScene');
+        }
     } catch (error) {
         console.error('Ошибка при обработке команды /start:', error);
         await ctx.reply('Произошла ошибка при запуске бота. Пожалуйста, попробуйте снова через несколько минут.');
