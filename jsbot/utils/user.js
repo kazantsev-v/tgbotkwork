@@ -26,7 +26,7 @@ const saveCustomerUser = async (customer) => {
         return response.data; // Успешный ответ
     } catch (error) {
         catchAxiosError(error);
-        
+        throw new Error(`Не удалось сохранить данные клиента: ${error.message}`);
     }
 }
 
@@ -37,7 +37,7 @@ const saveWorkerUser = async (worker) => {
         return response.data; // Успешный ответ
     } catch (error) {
         catchAxiosError(error);
-        
+        throw new Error(`Не удалось сохранить данные работника: ${error.message}`);
     }
 }
 

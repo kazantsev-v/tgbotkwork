@@ -6,6 +6,7 @@ const { default: axios } = require('axios');
 https.globalAgent.options.rejectUnauthorized = false;
 const bodyParser = require('body-parser');
 const { config } = require('./config/config');
+const { getUsersProfile } = require('./utils/user'); // Добавляем импорт функции getUsersProfile
 
 const newUserMiddleware = require('./middlewares/newUserMiddleware');
 const errorHandlingMiddleware = require('./middlewares/errorHandlingMiddleware');
