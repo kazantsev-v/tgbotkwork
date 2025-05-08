@@ -26,8 +26,13 @@ workerRoleSelectionScene.action(/worker_/, async (ctx) => {
     const role = ctx.match.input.split('_')[1]; // Извлечение типа роли
     ctx.session.role = role;
     
-    if (ctx.session.step === 'roleChange') ctx.scene.enter("roleInfoScene");
-    ctx.scene.enter('workerInfoScene'); // Переход к следующей сцене для сбора остальных данных
+    if (ctx.session.step === 'roleChange') {
+        // Если это изменение роли, идем в roleInfoScene
+        await ctx.scene.enter("roleInfoScene");
+    } else {
+        // Иначе идем в workerInfoScene для новой регистрации
+        await ctx.scene.enter('workerInfoScene');
+    }
 });
 
 module.exports = workerRoleSelectionScene;
