@@ -9,7 +9,7 @@ const {
 const { updateUserSceneStep } = require('../utils/user');
 const { updateStep } = require('../utils/common');
 const { metro_stations } = require('../models/common');
-
+const { sendKeyboard, clearKeyboard } = require('../utils/keyboardManager');
 
 const editProfileScene = new Scenes.BaseScene('editProfileScene');
 let isCustomer;
@@ -47,6 +47,9 @@ async function updateProfile(userId, updatedData) {
 editProfileScene.enter(async (ctx) => {
     isCustomer = ctx.session.role === 'customer';
     const fields = isCustomer ? fieldsForCustomer : fieldsForWorker;
+
+    // Очищаем предыдущую клавиатуру перед показом новой
+    await clearKeyboard(ctx, 'Загрузка редактора профиля...');
 
     await updateStep(
         ctx, 
@@ -138,13 +141,16 @@ editProfileScene.action(/^edit_(.+)$/, async (ctx) => {
 // Обработчик для текста (изменение поля)
 editProfileScene.on(message('text'), async (ctx) => {
     if (ctx.message.text === 'Отменить') {
-        await ctx.reply('Изменение отменено.', Markup.removeKeyboard());
+        // Очищаем клавиатуру перед возвратом на предыдущий экран
+        await clearKeyboard(ctx, 'Изменение отменено.');
         return ctx.scene.reenter();
     }
 
     if (ctx.message.text === 'Назад') {
+        // Очищаем клавиатуру перед переходом на другую сцену
+        await clearKeyboard(ctx, 'Переход в профиль...');
         await ctx.scene.enter('profileScene');
-        return ctx.scene.reenter();
+        return;
     }
 
     // Обработка выбора метода оплаты

@@ -1,9 +1,13 @@
 const { Scenes, Markup } = require('telegraf');
 const { updateUserSceneStep } = require('../utils/user');
+const { sendKeyboard, clearKeyboard } = require('../utils/keyboardManager');
 
 const mainScene = new Scenes.BaseScene('mainScene');
 
 mainScene.enter(async (ctx) => {
+    // Сначала очищаем предыдущую клавиатуру
+    await clearKeyboard(ctx, 'Загрузка главного меню...');
+
     await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
     const isCustomer = ctx.session.role === 'customer'; // Проверка роли (заказчик или рабочий)
     console.log(ctx.session.role)
@@ -44,9 +48,9 @@ mainScene.enter(async (ctx) => {
 
     const buttons = isCustomer ? customerButtons : workerButtons;
 
-    await ctx.reply('Выберите действие:', Markup.inlineKeyboard(buttons, { columns: 2 }).resize());
+    // Используем новую функцию sendKeyboard для безопасного отображения кнопок
+    await sendKeyboard(ctx, 'Выберите действие:', Markup.inlineKeyboard(buttons, { columns: 2 }).resize());
 });
-
 
 mainScene.action('profile', async (ctx) => {
     await ctx.scene.enter('profileScene');

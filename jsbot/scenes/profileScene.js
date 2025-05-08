@@ -2,6 +2,7 @@ const { Scenes, Markup } = require('telegraf');
 const  { daysOfWeek } = require('../utils/keyboards');
 const { updateUserSceneStep, updateUserBalance } = require('../utils/user');
 const { updateStep } = require('../utils/common');
+const { sendKeyboard, clearKeyboard } = require('../utils/keyboardManager');
 
 function formatWorkDays(workDays) {
     return workDays.map(day => daysOfWeek.find(d => d.id === day).text).join(', ');
@@ -60,6 +61,9 @@ const profileScene = new Scenes.BaseScene('profileScene');
 
 profileScene.enter(async (ctx) => {
     try {
+        // Сначала очищаем предыдущую клавиатуру
+        await clearKeyboard(ctx, 'Загрузка профиля...');
+        
         await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
         const role = ctx.session.role;
         const isCustomer = ctx.session.role === 'customer'; // Проверяем роль
@@ -129,7 +133,8 @@ profileScene.enter(async (ctx) => {
                 await ctx.replyWithHTML(`<b>Платежные данные:</b>\n${companyDetailsDoc}`);
             }
 
-            await ctx.reply('Что вы хотите сделать?', Markup.keyboard([
+            // Используем sendKeyboard вместо простого reply
+            await sendKeyboard(ctx, 'Что вы хотите сделать?', Markup.keyboard([
                 ['Изменить данные'], 
                 ['Пополнить баланс','Назад']
             ]).resize());
@@ -165,14 +170,12 @@ profileScene.enter(async (ctx) => {
             } else if (role === 'dismantler') {
                 message += `<b>Свой инструмент:</b> ${hasTools ? '✅' : '❌'}\n`;
             } else if (role === 'loader') {
-                message += `<b>Свой инструмент:</b> ${hasFurnitureTools ? '✅' : '❌'}\n`;
-            } else if (role === 'handyman') {
-                message += `<b>Работа в области:</b> ${workInRegion ? '✅' : '❌'}\n`;
             }
 
             await ctx.replyWithHTML(message);
 
-            await ctx.reply('Что вы хотите сделать?', Markup.keyboard([
+            // Используем sendKeyboard вместо простого reply
+            await sendKeyboard(ctx, 'Что вы хотите сделать?', Markup.keyboard([
                 ['Моя статистика', 'Изменить данные'],
                 ['Назад']
             ]).resize());
