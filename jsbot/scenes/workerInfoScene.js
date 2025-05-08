@@ -173,8 +173,18 @@ const workerInfoScene = new Scenes.BaseScene('workerInfoScene');
         ctx.session.workerInfo.metroStation = ctx.match[1];
         ctx.session.workerInfo.location = getStationCoordinates(ctx.session.workerInfo.metroStation);
         ctx.session.workerInfo.address = ctx.session.workerInfo.metroStation;
-        ctx.session.step = 'paymentDetails';
-        await ctx.reply('Введите реквизиты для оплаты (например, номер карты):');
+        
+        // Исправляем: вместо перехода к paymentDetails сразу,
+        // показываем выбор метода оплаты (paymentMethod)
+        await updateStep(
+            ctx, 
+            'paymentMethod',
+            'Выберите реквизит для оплаты:', 
+            Markup.keyboard([
+                Markup.button.callback('СБП', 'sbp'),
+                Markup.button.callback('Номер Карты', 'card'),
+            ])
+        );
     });
 
     workerInfoScene.action(/time_(\d+)/, async (ctx) => {
@@ -268,9 +278,19 @@ const workerInfoScene = new Scenes.BaseScene('workerInfoScene');
 
         ctx.session.workerInfo.metroStation = getNearestMetroStation(ctx.message.location).name;
         ctx.session.workerInfo.address = ctx.session.workerInfo.metroStation;
-        ctx.session.step = 'paymentDetails';
+        
         await ctx.reply(`Ближайшая станция метро: ${ctx.session.workerInfo.metroStation}`);
-        await ctx.reply('Введите реквизиты для оплаты (например, номер карты):');
+        
+        // Исправляем: показываем выбор метода оплаты (paymentMethod) вместо запроса реквизитов
+        await updateStep(
+            ctx, 
+            'paymentMethod',
+            'Выберите реквизит для оплаты:', 
+            Markup.keyboard([
+                Markup.button.callback('СБП', 'sbp'),
+                Markup.button.callback('Номер Карты', 'card'),
+            ])
+        );
     });
     
     module.exports = workerInfoScene;
