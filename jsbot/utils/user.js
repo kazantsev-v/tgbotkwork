@@ -45,9 +45,9 @@ const saveWorkerUser = async (worker) => {
 async function getUsersProfile(telegramId) {
     try {
         console.log(`Запрос профиля для пользователя ${telegramId}`);
-        const profile = await apiService.users.getProfile(telegramId);
-        console.log(`Получен профиль для ${telegramId}:`, JSON.stringify(profile).substring(0, 100) + '...');
-        return profile;
+        const response = await axios.get(`${backend_URL}/users/${telegramId}`);
+        console.log(`Успешно получен профиль через резервный метод:`, JSON.stringify(response.data).substring(0, 100) + '...');
+        return response.data;
     } catch (error) {
         console.error(`Ошибка при получении профиля пользователя ${telegramId}:`, error.message);
         
@@ -55,9 +55,7 @@ async function getUsersProfile(telegramId) {
         try {
             console.log(`Используем резервный метод для получения профиля пользователя ${telegramId}`);
             // Важно! Используем полный URL, а не относительный
-            const response = await axios.get(`${backend_URL}/users/${telegramId}`);
-            console.log(`Успешно получен профиль через резервный метод:`, JSON.stringify(response.data).substring(0, 100) + '...');
-            return response.data;
+            
         } catch (fallbackError) {
             console.error(`Ошибка резервного метода:`, fallbackError.message);
             
