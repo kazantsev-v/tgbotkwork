@@ -46,7 +46,6 @@ async function getUsersProfile(telegramId) {
     try {
         console.log(`Запрос профиля для пользователя ${telegramId}`);
         const response = await axios.get(`${backend_URL}/users/${telegramId}`);
-        console.log(`Успешно получен профиль через резервный метод:`, JSON.stringify(response.data).substring(0, 100) + '...');
         return response.data;
     } catch (error) {
         console.error(`Ошибка при получении профиля пользователя ${telegramId}:`, error.message);
