@@ -126,8 +126,11 @@ class KeyboardSender {
         disablePreview = true 
       } = options;
       
+      // Проверка на пустой текст - добавляем пробел если текст пустой
+      const safeText = !text || text.trim() === '' ? ' ' : text;
+      
       if (clearPrevious) {
-        await ctx.reply("", Markup.removeKeyboard());
+        await ctx.reply(" ", Markup.removeKeyboard());
       }
       
       const messageOptions = {
@@ -137,13 +140,15 @@ class KeyboardSender {
       };
       
       if (editExisting && ctx.callbackQuery?.message) {
-        return await ctx.editMessageText(text, messageOptions);
+        return await ctx.editMessageText(safeText, messageOptions);
       }
       
-      return await ctx.reply(text, messageOptions);
+      return await ctx.reply(safeText, messageOptions);
     } catch (error) {
       console.error('Ошибка при отправке клавиатуры:', error);
-      return ctx.reply(text, keyboard);
+      // Если возникла ошибка, пробуем ещё раз с безопасным текстом
+      const safeText = !text || text.trim() === '' ? ' ' : text;
+      return ctx.reply(safeText, keyboard);
     }
   }
   
@@ -154,7 +159,9 @@ class KeyboardSender {
    * @returns {Promise} Промис с результатом отправки
    */
   static async clear(ctx, text = "Клавиатура убрана") {
-    return await ctx.reply(text, Markup.removeKeyboard());
+    // Проверка на пустой текст, как и в методе send
+    const safeText = !text || text.trim() === '' ? ' ' : text;
+    return await ctx.reply(safeText, Markup.removeKeyboard());
   }
 }
 

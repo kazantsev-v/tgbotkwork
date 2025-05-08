@@ -10,6 +10,7 @@ const { updateUserSceneStep } = require('../utils/user');
 const { updateStep } = require('../utils/common');
 const { metro_stations } = require('../models/common');
 const { sendKeyboard, clearKeyboard } = require('../utils/keyboardManager');
+const { validateSBP, validateCardNumber } = require('../utils/validators'); // Добавляем импорт
 
 const editProfileScene = new Scenes.BaseScene('editProfileScene');
 let isCustomer;
@@ -161,13 +162,16 @@ editProfileScene.on(message('text'), async (ctx) => {
                 'sbpNumber',
                 'Введите номер телефона, привязанный к СБП:'
             );
-            return;
+            return; // Добавляем return для завершения обработки
         } else if (ctx.message.text === 'Номер Карты') {
             await updateStep(
                 ctx, 
                 'cardNumber',
                 'Введите номер карты:'
             );
+            return; // Добавляем return для завершения обработки
+        } else {
+            await ctx.reply('Выберите СБП или Номер Карты используя кнопки');
             return;
         }
     }

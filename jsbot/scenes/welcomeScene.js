@@ -13,47 +13,48 @@ const {
 const welcomeScene = new Scenes.BaseScene('welcomeScene');
 
 welcomeScene.enter(async (ctx) => {
-    if (process.env.NODE_ENV === 'development') {
-        //ctx.session = workerInfoSessionMock;
-    }
     try {
         console.log(`Получение профиля для пользователя: ${ctx.from.id}`);
         const profile = await getUsersProfile(ctx.from.id);
         
         if (profile) {
-            ctx.session.userId = profile.id;
-            if (!ctx.session.balance)
-                ctx.session.balance = 0;
+            console.log(`Профиль найден: ${JSON.stringify(profile)}`);
 
             if (profile.role === 'moderator') {
-                ctx.reply('Добро пожаловать, модератор.', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [
-                                Markup.button.webApp(
-                                    'Админ Панель',
-                                    'https://bot.moverspb.ru:4200'
-                                )
-                            ],
-                        ],
-                    },
-                });
                 return;
             } else if (profile.role === 'customer') {
-                const customerProfile = await getCustomerProfile(ctx.from.id);
-                await loadCustomerProfile(customerProfile, ctx);
-                console.log(customerProfile);
-                ctx.scene.enter(ctx.session.scene || 'mainScene');
-                return;
-            } else if (
-                /worker|driver|rigger|dismantler|loader|handyman/.test(profile.role)
-            ) {
-                const workerProfile = await getWorkerProfile(ctx.from.id);
-                await loadWorkerProfile(workerProfile, ctx);
-                console.log(workerProfile);
-                ctx.scene.enter(ctx.session.scene || 'mainScene');
-                return;
+                // Загружаем профиль заказчика
+                try {
+                    const customerProfile = await getCustomerProfile(ctx.from.id);
+                    if (customerProfile) {
+                        await loadCustomerProfile(customerProfile, ctx);
+                        await ctx.scene.enter('mainScene');
+                        return;
+                    }
+                } catch (err) {
+                    console.error(`Ошибка при загрузке профиля заказчика: ${err.message}`);
+                }
+            } else if (/worker|driver|rigger|dismantler|loader|handyman/.test(profile.role)) {
+                // Загружаем профиль работника
+                try {
+                    const workerProfile = await getWorkerProfile(ctx.from.id);
+                    if (workerProfile) {
+                        await loadWorkerProfile(workerProfile, ctx);
+                        await ctx.scene.enter('mainScene');
+                        return;
+                    }
+                } catch (err) {
+                    console.error(`Ошибка при загрузке профиля работника: ${err.message}`);
+                }
             }
+            
+            // Если не удалось загрузить профиль, но пользователь есть - переходим на mainScene
+            ctx.session.telegramId = profile.telegramId;
+            ctx.session.role = profile.role;
+            ctx.session.scene = profile.scene || 'mainScene';
+            ctx.session.step = profile.step || 0;
+            await ctx.scene.enter('mainScene');
+            return;
         } else {
             console.log(`Профиль не найден, создаем новый для пользователя ${ctx.from.id}`);
             // Инициализация нового пользователя
@@ -80,33 +81,6 @@ welcomeScene.enter(async (ctx) => {
                 console.error(`Ошибка инициализации: ${initError.message}`);
             }
         }
-    }
-
-    // Если мы дошли до этой точки, значит у пользователя нет роли или это новый пользователь
-    try {
-        // Попробуем получить профиль ещё раз для новосозданного пользователя
-        const profile = await getUsersProfile(ctx.from.id);
-        
-        if (profile && profile.role !== 'moderator') {
-            ctx.session.telegramId = ctx.from.id;
-            const welcomeText = `
-            Ищете работу?
-            - Найдите вакансии по своим навыкам.
-            - Сохраните понравившиеся объявления.
-            - Получите советы по поиску работы.
-            `;
-            await ctx.replyWithPhoto({ source: './assets/img/welcome.jpg' }, Markup.removeKeyboard());
-            await ctx.reply(welcomeText,
-                Markup.inlineKeyboard([
-                    Markup.button.callback('Приступить', 'welcome_proceed')
-                ])
-            );
-        } else {
-            await ctx.reply('Добро пожаловать! Ваш профиль еще не создан или вы являетесь модератором.');
-        }
-    } catch (error) {
-        console.error(`Финальная ошибка в welcomeScene: ${error.message}`);
-        await ctx.reply('Извините, произошла ошибка. Пожалуйста, попробуйте позже или напишите /start снова.');
     }
 });
 

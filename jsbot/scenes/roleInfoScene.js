@@ -249,14 +249,19 @@ roleInfoScene.on(message('text'), async (ctx) => {
                     'sbpNumber',
                     'Введите номер телефона, привязанный к СБП:'
                 );
+                return; // Добавляем return для завершения обработки
             } else if (text === 'Номер Карты') {
                 await updateStep(
                     ctx, 
                     'cardNumber',
                     'Введите номер карты:'
                 );
+                return; // Добавляем return для завершения обработки
+            } else {
+                await ctx.reply('Выберите СБП или Номер Карты используя кнопки');
+                return;
             }
-            break;
+            break; // Этот код не выполнится из-за return выше
         case 'sbpNumber':
             if (validateSBP(text)) {
                 ctx.session.customerInfo.companyDetailsDoc = `СБП: ${text}`;
