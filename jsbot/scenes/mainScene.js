@@ -73,8 +73,11 @@ mainScene.action('view_tasks', async (ctx) => {
 });
 
 mainScene.action('settings', async (ctx) => {
-    await ctx.reply("Настройки в данный момент не доступны")
+    await ctx.reply("Настройки в данный момент не доступны");
 });
 
+mainScene.action('reminders', async (ctx) => {
+    await ctx.scene.enter('remindersScene');
+});
 
 module.exports = mainScene;
