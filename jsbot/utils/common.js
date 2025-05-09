@@ -4,8 +4,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 const { User, Worker, Customer } = require("../models/user");
 const { Task, TaskPhoto } = require("../models/task");
-const { config } = require('../config/config');
-const apiService = require('./apiService');
+const { config } = require('../config/config')
 const { updateUserSceneStep } = require('./user');
 const { catchAxiosError } = require('./errors');
 
@@ -119,27 +118,23 @@ const convertTimeToDbFormat = (hours) => {
 
 const createReminder = async (reminder) => {
     try {
-        console.log('Создание напоминания:', reminder);
-        // Используем apiService вместо прямого вызова axios
-        const result = await apiService.post('reminders', reminder);
-        console.log('Reminder saved:', result);
-        return result;
+        console.log(reminder);
+        const response = await axios.post(backend_URL+'/reminders', reminder);
+        console.log('Reminder saved:', response.data);
+        return response.data.task;
     } catch (error) {
-        // Подробный лог ошибки для диагностики
-        console.error('Error saving reminder:', error.message);
-        // Возвращаем объект с информацией об ошибке вместо undefined
-        return { error: true, message: error.message };
+        console.error('Error saving reminder:', catchAxiosError(error));
+        return;
     }
 }
 
 // Добавляем функцию для получения напоминаний
 const getReminders = async (userId) => {
     try {
-        // Используем apiService вместо прямого вызова axios
-        const result = await apiService.get(`reminders`, { userId });
-        return result.reminders;
+        const response = await axios.get(`${backend_URL}/reminders?userId=${userId}`);
+        return response.data.reminders;
     } catch (error) {
-        console.error('Error fetching reminders:', error.message);
+        console.error('Error fetching reminders:', catchAxiosError(error));
         throw new Error('Не удалось загрузить напоминания');
     }
 }
