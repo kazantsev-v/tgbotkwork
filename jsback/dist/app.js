@@ -78,6 +78,7 @@ app.use("/api/users", userRoutes_1.default);
 app.use("/api/tasks", taskRoutes_1.default);
 app.use("/api/reminders", reminderRoutes_1.default);
 app.use("/api/reviews", reviewRoutes_1.default);
+app.use("/api/notification-chats", require("./routes/notificationChatRoutes"));
 // Запуск подключения к БД
 database_1.AppDataSource.initialize()
     .then(() => {

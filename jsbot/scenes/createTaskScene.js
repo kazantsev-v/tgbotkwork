@@ -297,12 +297,29 @@ async function finishTaskCreation(ctx) {
     try {
         const user = await getUsersProfile(ctx.session.telegramId);
         const task = await createTask(user, ctx.session.task);
-        if(ctx.session.task.photos)
+        
+        if(ctx.session.task.photos) {
             await uploadTaskPhotos(ctx, task.id, ctx.session.task.photos);
+        }
+        
         console.log('Созданное задание:', task);
-        await createRemindersForTask(ctx, task)
+        await createRemindersForTask(ctx, task);
+        
+        // Отправляем уведомления о новом задании, если задание одобрено
+        if (task.status === 'approved') {
+            try {
+                const { sendTaskNotification } = require('../utils/notifications');
+                await sendTaskNotification(ctx.telegram, task, true);
+                console.log(`Отправлены уведомления о новом задании ${task.id}`);
+            } catch (notificationError) {
+                console.error('Ошибка при отправке уведомлений о новом задании:', notificationError.message);
+            }
+        }
+        
         await ctx.reply('Задание успешно создано и отправлено на модерацию.');
     } catch (error) {
+        console.error('Ошибка при создании задания:', error.message);
+        await ctx.reply('Произошла ошибка при создании задания. Пожалуйста, попробуйте позже.');
         throw error;
     }
     

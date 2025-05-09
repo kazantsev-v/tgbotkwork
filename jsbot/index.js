@@ -7,6 +7,13 @@ https.globalAgent.options.rejectUnauthorized = false;
 const bodyParser = require('body-parser');
 const { config } = require('./config/config');
 const { getUsersProfile } = require('./utils/user'); // Добавляем импорт функции getUsersProfile
+const { 
+    sendNewTasksNotifications, 
+    loadNotificationChats, 
+    addNotificationChat,
+    removeNotificationChat,
+    sendTaskNotification
+} = require('./utils/notifications'); // Импортируем функции для уведомлений
 
 const newUserMiddleware = require('./middlewares/newUserMiddleware');
 const errorHandlingMiddleware = require('./middlewares/errorHandlingMiddleware');
@@ -117,6 +124,155 @@ bot.on('text', async (ctx) => {
     }
 });
 
+// Добавляем обработчик для автоматической отправки уведомлений о новых заданиях
+bot.command('sendnotifications', async (ctx) => {
+    // Проверяем, что команда пришла от администратора (можно настроить список ID админов)
+    const adminIds = [123456789]; // Замените на реальные ID администраторов
+    if (!adminIds.includes(ctx.from.id)) {
+        return ctx.reply('У вас нет прав для выполнения этой команды.');
+    }
+    
+    try {
+        await ctx.reply('Начинаю отправку уведомлений о новых заданиях...');
+        const sentCount = await sendNewTasksNotifications(bot);
+        await ctx.reply(`Отправлено уведомлений: ${sentCount}`);
+    } catch (error) {
+        console.error('Ошибка при отправке уведомлений:', error.message);
+        await ctx.reply('Произошла ошибка при отправке уведомлений.');
+    }
+});
+
+// Обработчик для включения уведомлений в групповом чате
+bot.command('enablenotifications', async (ctx) => {
+    // Проверяем, что команда вызвана в групповом чате
+    if (!ctx.chat || (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup')) {
+        return ctx.reply('Эта команда доступна только в групповых чатах.');
+    }
+    
+    // Проверяем, что команду вызвал администратор чата
+    try {
+        const chatMember = await ctx.getChatMember(ctx.from.id);
+        if (chatMember.status !== 'creator' && chatMember.status !== 'administrator') {
+            return ctx.reply('Эта команда доступна только администраторам чата.');
+        }
+        
+        // Добавляем чат в список для уведомлений
+        const success = await addNotificationChat(ctx.chat.id, ctx.chat.title, ctx.chat.type);
+        
+        if (success) {
+            await ctx.reply('✅ Уведомления о новых заданиях включены для этого чата!');
+        } else {
+            await ctx.reply('❌ Не удалось включить уведомления. Попробуйте позже.');
+        }
+    } catch (error) {
+        console.error('Ошибка при включении уведомлений:', error.message);
+        await ctx.reply('Произошла ошибка при включении уведомлений.');
+    }
+});
+
+// Обработчик для отключения уведомлений в групповом чате
+bot.command('disablenotifications', async (ctx) => {
+    // Проверяем, что команда вызвана в групповом чате
+    if (!ctx.chat || (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup')) {
+        return ctx.reply('Эта команда доступна только в групповых чатах.');
+    }
+    
+    // Проверяем, что команду вызвал администратор чата
+    try {
+        const chatMember = await ctx.getChatMember(ctx.from.id);
+        if (chatMember.status !== 'creator' && chatMember.status !== 'administrator') {
+            return ctx.reply('Эта команда доступна только администраторам чата.');
+        }
+        
+        // Удаляем чат из списка для уведомлений
+        const success = await removeNotificationChat(ctx.chat.id);
+        
+        if (success) {
+            await ctx.reply('✅ Уведомления о новых заданиях отключены для этого чата.');
+        } else {
+            await ctx.reply('❌ Не удалось отключить уведомления. Попробуйте позже.');
+        }
+    } catch (error) {
+        console.error('Ошибка при отключении уведомлений:', error.message);
+        await ctx.reply('Произошла ошибка при отключении уведомлений.');
+    }
+});
+
+// Обработка колбэков от уведомлений о новых заданиях
+bot.action(/view_notification_task_(\d+)/, async (ctx) => {
+    try {
+        const taskId = ctx.match[1];
+        // Отвечаем на колбэк, чтобы убрать "часы загрузки" с кнопки
+        await ctx.answerCbQuery();
+        
+        // Помещаем пользователя в сцену просмотра заданий
+        ctx.session = ctx.session || {};
+        ctx.session.viewTaskId = taskId;
+        await ctx.scene.enter('workerViewTasksScene');
+    } catch (error) {
+        console.error('Ошибка при просмотре задания из уведомления:', error.message);
+        await ctx.answerCbQuery('Произошла ошибка. Попробуйте позже.');
+    }
+});
+
+bot.action(/take_notification_task_(\d+)/, async (ctx) => {
+    try {
+        const taskId = ctx.match[1];
+        await ctx.answerCbQuery('Обрабатываем вашу заявку...');
+        
+        // Проверяем, авторизован ли пользователь
+        const profile = await getUsersProfile(ctx.from.id);
+        if (!profile) {
+            await ctx.reply('Для того чтобы взять задание, необходимо зарегистрироваться. Отправьте команду /start и пройдите регистрацию.');
+            return;
+        }
+        
+        // Проверяем, является ли пользователь работником
+        if (!profile.role || !/worker|driver|rigger|dismantler|loader|handyman/.test(profile.role)) {
+            await ctx.reply('Только зарегистрированные исполнители могут брать задания.');
+            return;
+        }
+        
+        // Здесь код для фактического взятия задания
+        const { takeTask } = require('./utils/task');
+        const result = await takeTask(taskId, profile.id);
+        
+        if (result) {
+            await ctx.reply('✅ Вы успешно откликнулись на задание! Заказчик получит уведомление о вашей заявке.');
+        } else {
+            await ctx.reply('❌ Не удалось взять задание. Возможно, оно уже было отдано другому исполнителю или отменено.');
+        }
+    } catch (error) {
+        console.error('Ошибка при взятии задания из уведомления:', error.message);
+        await ctx.reply('Произошла ошибка при обработке вашей заявки. Пожалуйста, попробуйте позже.');
+    }
+});
+
+// Периодическая проверка и отправка уведомлений о новых заданиях (каждые 5 минут)
+const NOTIFICATION_INTERVAL = 5 * 60 * 1000; // 5 минут в миллисекундах
+
+// Загружаем список чатов при запуске бота
+loadNotificationChats().then(chats => {
+    console.log(`Загружены чаты для уведомлений: ${chats.length}`);
+}).catch(error => {
+    console.error('Ошибка при загрузке чатов для уведомлений:', error.message);
+});
+
+// Запускаем интервал для отправки уведомлений
+const notificationInterval = setInterval(async () => {
+    try {
+        console.log('Проверка и отправка уведомлений о новых заданиях...');
+        const sentCount = await sendNewTasksNotifications(bot);
+        if (sentCount > 0) {
+            console.log(`Отправлено ${sentCount} уведомлений о новых заданиях`);
+        } else {
+            console.log('Новых заданий для отправки уведомлений не найдено');
+        }
+    } catch (error) {
+        console.error('Ошибка при автоматической отправке уведомлений:', error.message);
+    }
+}, NOTIFICATION_INTERVAL);
+
 const app = express();
 app.use(bodyParser.json());
 
@@ -192,6 +348,12 @@ process.on('uncaughtException', (error) => {
     // Не завершаем процесс, чтобы бот продолжал работать
 });
 
-// Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'))
-process.once('SIGTERM', () => bot.stop('SIGTERM'))
+// При остановке бота очищаем интервал
+process.once('SIGINT', () => {
+    clearInterval(notificationInterval);
+    bot.stop('SIGINT');
+});
+process.once('SIGTERM', () => {
+    clearInterval(notificationInterval);
+    bot.stop('SIGTERM');
+});

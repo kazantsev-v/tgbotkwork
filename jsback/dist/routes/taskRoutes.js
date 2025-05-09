@@ -355,6 +355,36 @@ router.patch('/:taskId/take', async (req, res) => {
         res.status(500).json({ message: 'Ошибка обновления статуса задания.' });
     }
 });
+router.patch('/:taskId', async (req, res) => {
+    const { taskId } = req.params;
+    const updateData = req.body;
+
+    try {
+        const task = await taskRepo.findOne({
+            where: { id: Number(taskId) },
+            relations: ["creator", "executor", "moderator"]
+        });
+
+        if (!task) {
+            return res.status(404).json({ message: 'Задание не найдено' });
+        }
+
+        // Обновляем поля задания
+        Object.assign(task, updateData);
+        
+        // Если задание получило статус "одобрено", устанавливаем notificationSent в false, 
+        // чтобы система уведомлений знала, что нужно отправить уведомление
+        if (updateData.status === 'approved' && !task.notificationSent) {
+            task.notificationSent = false;
+        }
+
+        const updatedTask = await taskRepo.save(task);
+        res.json({ message: 'Задание успешно обновлено', task: updatedTask });
+    } catch (error) {
+        console.error('Ошибка при обновлении задания:', error);
+        res.status(500).json({ message: 'Ошибка при обновлении задания', error });
+    }
+});
 router.get("/:taskId", async (req, res) => {
     const { taskId } = req.params;
     try {

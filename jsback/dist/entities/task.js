@@ -34,6 +34,7 @@ let Task = class Task {
     duration;
     priority;
     start_time;
+    notificationSent;
 };
 exports.Task = Task;
 __decorate([
@@ -123,6 +124,10 @@ __decorate([
     (0, typeorm_1.Column)({ type: "time", nullable: true }),
     __metadata("design:type", String)
 ], Task.prototype, "start_time", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "boolean", default: false }),
+    __metadata("design:type", Boolean)
+], Task.prototype, "notificationSent", void 0);
 exports.Task = Task = __decorate([
     (0, typeorm_1.Entity)()
 ], Task);
