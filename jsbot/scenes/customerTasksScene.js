@@ -187,4 +187,102 @@ customerTasksScene.action(/^view_task_\d+$/, async (ctx) => {
     }
 });
 
+// Обработчик кнопки "Обновить"
+customerTasksScene.action(/^refresh_task_\d+$/, async (ctx) => {
+    try {
+        await ctx.answerCbQuery('Обновляем...');
+        const taskId = parseInt(ctx.match[0].split('_')[2]);
+
+        // Загружаем задание напрямую, чтобы получить актуальные данные
+        const task = await getTaskById(taskId);
+        
+        if (!task) {
+            return ctx.reply('Задание не найдено. Возможно, оно было удалено.');
+        }
+        
+        // Загружаем фотографии для задания
+        task.photos = await getPhotosByTaskId(taskId);
+        
+        // Формируем HTML-описание задания
+        await ctx.replyWithHTML(
+            `<b>Обновлённая информация о задании:</b>\n\n` +
+            `<b>Название:</b> ${task.title}\n` +
+            `<b>Описание:</b> ${task.description}\n` +
+            `<b>Оплата:</b> ${task.payment}\n` +
+            `<b>Упаковка нашим материалом:</b> ${task.pack_needed ? `Да (${task.pack_description || 'без описания'})` : 'Нет'}\n` +
+            `<b>Дополнительный инструмент:</b> ${task.tool_needed ? `Да (${task.tool_description || 'без описания'})` : 'Нет'}\n` +
+            `<b>Сборка/Разборка:</b> ${task.assemble_needed ? `Да (${task.assemble_description || 'без описания'})` : 'Нет'}\n` +
+            `<b>Дата создания:</b> ${formatDate(task.created_at)}\n` +
+            `<b>Описание для модератора:</b> ${task.moderator_description || 'Не указано'}\n` +
+            `<b>Местоположение:</b> ${task.location}\n` +
+            `<b>Даты исполнения:</b> ${Array.isArray(task.dates) ? task.dates.join(', ') : task.dates}\n` +
+            `<b>Время начала:</b> ${task.start_time || 'Не указано'}\n` +
+            `<b>Количество рабочих часов:</b> ${task.duration || 'Не указано'} ч\n` +
+            `<b>Исполнитель:</b> ${task.executor?.name || 'не назначен'}\n` +
+            `<b>Статус:</b> ${task.status || 'новое'}\n`
+        );
+
+        // Отправляем фотографии, если есть
+        if (task.photos && task.photos.length) {
+            for (const photo of task.photos) {
+                try {
+                    if (!photo.startsWith("http")) {
+                        await ctx.replyWithPhoto(photo);
+                    } else {
+                        await ctx.replyWithPhoto({ url: photo });
+                    }
+                } catch (photoError) {
+                    console.error(`Ошибка при отправке фото для задания ${taskId}:`, photoError.message);
+                }
+            }
+        }
+        
+        // Добавляем кнопки управления заданием
+        await ctx.reply(
+            'Действия с заданием:',
+            Markup.inlineKeyboard([
+                [Markup.button.callback('🔄 Обновить', `refresh_task_${taskId}`)],
+                [Markup.button.callback('⬅️ К списку заданий', 'back_to_tasks')]
+            ])
+        );
+    } catch (error) {
+        console.error('Ошибка при обновлении задания:', error.message);
+        await ctx.reply('Извините, произошла ошибка при обновлении задания. Пожалуйста, попробуйте позже.');
+    }
+});
+
+// Обработчик кнопки "К списку заданий"
+customerTasksScene.action('back_to_tasks', async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+        ctx.session.step = 'showTasks';
+        await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
+        
+        // Загружаем задания заново
+        const tasks = await loadTasks(ctx);
+        
+        if (!tasks.length) {
+            await updateStep(
+                ctx, 
+                'showTasks',
+                'У вас пока нет заданий.', 
+                Markup.keyboard([['Назад']]).resize()
+            );
+        } else {
+            await updateStep(
+                ctx, 
+                'showTasks',
+                'Выберите задание чтобы увидеть подробности:', 
+                Markup.keyboard([['Назад']]).resize()
+            );
+        }
+
+        await showTasks(ctx, tasks);
+    } catch (error) {
+        console.error('Ошибка при возврате к списку заданий:', error.message);
+        await ctx.reply('Извините, произошла ошибка. Возвращаемся в главное меню...');
+        await ctx.scene.enter('mainScene');
+    }
+});
+
 module.exports = customerTasksScene;
