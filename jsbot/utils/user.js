@@ -168,33 +168,15 @@ const updateUserSceneStep = async (telegramId, scene, step) => {
     console.log(`Обновление сцены для пользователя ${telegramId}: ${scene}, шаг ${step}`);
     
     try {
-        // Первый метод - через apiService
-        await apiService.users.updateProfile(telegramId, { scene, step });
-        console.log(`Сцена успешно обновлена через apiService для ${telegramId}`);
+        // Используем apiService с максимальным количеством повторных попыток
+        const result = await apiService.patch(`users/${telegramId}`, { scene, step }, { retries: 5, retryDelay: 2000 });
+        console.log(`Сцена успешно обновлена для ${telegramId}`);
         return true;
     } catch (error) {
-        console.error(`Ошибка при обновлении сцены: ${error.message}`);
+        console.error(`Не удалось обновить сцену для ${telegramId}: ${error.message}`);
         
-        try {
-            // Второй метод - прямой запрос через axios
-            console.log(`Пробуем обновить сцену напрямую через axios для ${telegramId}`);
-            await axios.patch(`${backend_URL}/users/${telegramId}`, { scene, step });
-            console.log(`Сцена успешно обновлена через axios для ${telegramId}`);
-            return true;
-        } catch (axiosError) {
-            console.error(`Ошибка axios при обновлении сцены: ${axiosError.message}`);
-            
-            // Третий метод - прямой запрос через axios с PUT
-            try {
-                console.log(`Пробуем обновить сцену через PUT для ${telegramId}`);
-                await axios.put(`${backend_URL}/users/${telegramId}`, { scene, step });
-                console.log(`Сцена успешно обновлена через PUT для ${telegramId}`);
-                return true;
-            } catch (putError) {
-                console.error(`Все попытки обновления сцены не удались для ${telegramId}`);
-                return false;
-            }
-        }
+        // Возвращаем false, но не бросаем исключение, чтобы продолжить работу бота
+        return false;
     }
 }
 
