@@ -24,6 +24,7 @@ const {
     createTask
 } = require('../utils/task');
 const { Reminder } = require('../models/reminder');
+const { metro_stations } = require('../models/common');
 
 const createTaskScene = new Scenes.BaseScene('createTaskScene');
 
@@ -66,25 +67,41 @@ createTaskScene.on(message('text'), async (ctx) => {
                 ctx.session.task.description = input;
                 await updateStep(
                     ctx, 
-                    'location', 
-                    'Введите адрес места выполнения:'
+                    'geolocation',
+                    'Предоставьте местоположение', 
+                    Markup.keyboard([
+                        Markup.button.locationRequest('🌍Поделится геолокацией'),
+                        Markup.button.callback('📎Прикрепить геопозицию', 'g_location'),
+                        Markup.button.callback('🚊Выбрать ближайшую станцию метро:', 'm_location'),
+                        Markup.button.callback('✍🏻Ввести адрес вручную', 'direct_location'),
+                    ])
                 );
             } else {
                 await ctx.reply('Описание введено некорректно. Попробуйте ещё раз.');
             }
             break;
-        case 'location':
-            if (validateText(input)) {
-                ctx.session.task.location = input;
-                await updateStep(
-                    ctx, 
-                    'choose_dates', 
-                    'Выберите даты выполнения:', 
-                    generateDateKeyboard2((new Date()).getMonth(), (new Date()).getFullYear())
+        case 'geolocation':
+            if(input === '📎Прикрепить геопозицию') {
+                await ctx.reply('🌍Пожалуйста, отправьте геопозицию. 📎Прикрепить → 🌍Геопозиция', Markup.removeKeyboard());
+            } else if(input === '🚊Выбрать ближайшую станцию метро:') {
+                await ctx.reply('Выберите ближайшую станцию метро:', 
+                    Markup.inlineKeyboard(
+                        metro_stations.map(station => [Markup.button.callback(station, `metro_${station}`)])
+                    )
                 );
-            } else {
-                await ctx.reply('Локация введена некорректно. Попробуйте ещё раз.');
+            } else if(input === '✍🏻Ввести адрес вручную') {
+                ctx.session.step = 'direct_address';
+                await ctx.reply('Введите адрес:', Markup.removeKeyboard());
             }
+            break;
+        case 'direct_address':
+            ctx.session.task.location = input;
+            await updateStep(
+                ctx, 
+                'choose_dates', 
+                'Выберите даты выполнения:', 
+                generateDateKeyboard2((new Date()).getMonth(), (new Date()).getFullYear())
+            );
             break;
         case 'payment':
             if (validateNumericValue(input)) {
@@ -137,6 +154,39 @@ createTaskScene.on(message('text'), async (ctx) => {
             }
             break;
     }
+});
+
+createTaskScene.action(/metro_(.+)/, async (ctx, next) => {
+    console.log('in metro handler');
+    ctx.session.task.metroStation = ctx.match[1];
+    ctx.session.task.location = ctx.session.task.metroStation;
+    
+    await updateStep(
+        ctx, 
+        'choose_dates', 
+        `Вы выбрали станцию метро: ${ctx.session.task.metroStation}\nВыберите даты выполнения:`, 
+        generateDateKeyboard2((new Date()).getMonth(), (new Date()).getFullYear())
+    );
+});
+
+createTaskScene.on(message('location'), async (ctx, next) => {
+    console.log('in location handler');
+    ctx.session.task.coordinates = {
+        latitude: ctx.message.location.latitude, 
+        longitude: ctx.message.location.longitude
+    };
+
+    ctx.session.task.metroStation = getNearestMetroStation(ctx.message.location).name;
+    ctx.session.task.location = ctx.session.task.metroStation;
+    
+    await ctx.reply(`Ближайшая станция метро: ${ctx.session.task.metroStation}`);
+    
+    await updateStep(
+        ctx, 
+        'choose_dates', 
+        'Выберите даты выполнения:', 
+        generateDateKeyboard2((new Date()).getMonth(), (new Date()).getFullYear())
+    );
 });
 
 createTaskScene.action(/option_(.+)/, async (ctx) => {
