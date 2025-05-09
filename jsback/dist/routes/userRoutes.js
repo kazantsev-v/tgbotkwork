@@ -385,6 +385,31 @@ router.get("/worker/:telegramId/stats", async (req, res) => {
         res.status(500).json({ message: "Error retrieving worker stats", error });
     }
 });
+// Логическое удаление пользователя
+router.delete("/:userId", async (req, res) => {
+    const userRepo = database_1.AppDataSource.getRepository(user_1.User);
+    const { userId } = req.params;
+    
+    try {
+        const user = await userRepo.findOneBy({ id: Number(userId) });
+        
+        if (!user) {
+            return res.status(404).json({ message: "Пользователь не найден" });
+        }
+        
+        // Вместо физического удаления делаем логическое
+        user.isActive = false;
+        await userRepo.save(user);
+        
+        res.json({ 
+            message: "Пользователь успешно деактивирован", 
+            userId: user.id 
+        });
+    } catch (error) {
+        console.error("Ошибка при деактивации пользователя:", error);
+        res.status(500).json({ message: "Ошибка при деактивации пользователя", error });
+    }
+});
 async function handleRoleReminder(user, reminderRepo) {
     const nextDayAtTen = (0, date_fns_1.setSeconds)((0, date_fns_1.setMinutes)((0, date_fns_1.setHours)((0, date_fns_1.addDays)(new Date(), 1), 10), 0), 0);
     const existingReminder = await reminderRepo.findOne({

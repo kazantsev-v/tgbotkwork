@@ -197,26 +197,28 @@ const formatTaskNotification = (task, isApproved) => {
  */
 const sendNewTasksNotifications = async (bot) => {
     try {
-        // Получаем все одобренные задания, которые еще не были отправлены
-        const approvedTasks = await getAllApprovedTasks();
-        
-        // Фильтруем задания, по которым не были отправлены уведомления
-        // В будущем можно добавить флаг notificationSent в базу данных
-        const tasksToNotify = approvedTasks.filter(task => 
-            task.status === 'approved' && !task.notificationSent);
+        // Получаем все одобренные задания, по которым ещё не были отправлены уведомления
+        const response = await axios.get(`${config.backendURL}/tasks/new-notifications`);
+        const tasksToNotify = response.data || [];
         
         console.log(`Найдено ${tasksToNotify.length} новых одобренных заданий для отправки уведомлений`);
         
+        if (tasksToNotify.length === 0) {
+            return 0;
+        }
+        
         // Отправляем уведомления по каждому заданию
+        const taskIds = [];
+        
         for (const task of tasksToNotify) {
             await sendTaskNotification(bot, task, true);
-            
-            // Обновляем флаг, что уведомление отправлено
-            // В будущем это нужно реализовать в базе данных
-            await axios.patch(`${config.backendURL}/tasks/${task.id}`, {
-                notificationSent: true
-            });
+            taskIds.push(task.id);
         }
+        
+        // Отмечаем задания как "уведомление отправлено"
+        await axios.patch(`${config.backendURL}/tasks/mark-notified`, {
+            taskIds: taskIds
+        });
         
         return tasksToNotify.length;
     } catch (error) {

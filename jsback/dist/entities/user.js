@@ -25,6 +25,7 @@ let User = class User {
     scene;
     step;
     balance;
+    isActive;
 };
 exports.User = User;
 __decorate([
@@ -63,6 +64,10 @@ __decorate([
     (0, typeorm_1.Column)('float', { nullable: true }),
     __metadata("design:type", Number)
 ], User.prototype, "balance", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ default: true }),
+    __metadata("design:type", Boolean)
+], User.prototype, "isActive", void 0);
 exports.User = User = __decorate([
     (0, typeorm_1.Entity)()
 ], User);

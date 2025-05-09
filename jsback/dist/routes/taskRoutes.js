@@ -396,4 +396,54 @@ router.get("/:taskId", async (req, res) => {
         res.status(500).json({ message: "Error retrieving task", error });
     }
 });
+// Получение заданий, по которым ещё не отправлялись уведомления
+router.get("/new-notifications", async (req, res) => {
+    try {
+        const tasks = await taskRepo.find({
+            where: { 
+                status: 'approved', 
+                notificationSent: false
+            },
+            relations: ["creator", "executor", "moderator"]
+        });
+        res.json(tasks);
+    } catch (error) {
+        console.error("Ошибка при получении заданий для уведомлений:", error);
+        res.status(500).json({ message: "Ошибка при получении заданий для уведомлений", error });
+    }
+});
+
+// Отметка заданий как "уведомление отправлено"
+router.patch("/mark-notified", async (req, res) => {
+    const { taskIds } = req.body;
+    
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+        return res.status(400).json({ message: "Требуется массив ID заданий" });
+    }
+    
+    try {
+        const tasks = await taskRepo.find({
+            where: { id: (0, typeorm_1.In)(taskIds) }
+        });
+        
+        if (tasks.length === 0) {
+            return res.status(404).json({ message: "Задания не найдены" });
+        }
+        
+        // Отмечаем все найденные задания как "уведомление отправлено"
+        for (const task of tasks) {
+            task.notificationSent = true;
+        }
+        
+        await taskRepo.save(tasks);
+        
+        res.json({ 
+            message: "Задания успешно отмечены как отправленные", 
+            count: tasks.length 
+        });
+    } catch (error) {
+        console.error("Ошибка при отметке заданий как отправленных:", error);
+        res.status(500).json({ message: "Ошибка при отметке заданий как отправленных", error });
+    }
+});
 exports.default = router;
