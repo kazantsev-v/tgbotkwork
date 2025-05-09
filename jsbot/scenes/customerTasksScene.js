@@ -161,10 +161,22 @@ customerTasksScene.action(/^view_task_\d+$/, async (ctx) => {
         if (task.photos && task.photos.length) {
             for (const photo of task.photos) {
                 try {
-                    if (!photo.startsWith("http")) {
-                        await ctx.replyWithPhoto(photo);
+                    // Проверяем, что photo это объект или строка
+                    if (typeof photo === 'string') {
+                        // Если это строка, проверяем начинается ли она с http
+                        if (photo.startsWith("http")) {
+                            await ctx.replyWithPhoto({ url: photo });
+                        } else {
+                            await ctx.replyWithPhoto(photo);
+                        }
+                    } else if (photo && photo.url) {
+                        // Если это объект с URL
+                        await ctx.replyWithPhoto({ url: photo.url });
+                    } else if (photo && photo.file_id) {
+                        // Если это объект с file_id
+                        await ctx.replyWithPhoto(photo.file_id);
                     } else {
-                        await ctx.replyWithPhoto({ url: photo });
+                        console.log('Неизвестный формат фото:', photo);
                     }
                 } catch (photoError) {
                     console.error(`Ошибка при отправке фото для задания ${taskId}:`, photoError.message);
@@ -226,10 +238,22 @@ customerTasksScene.action(/^refresh_task_\d+$/, async (ctx) => {
         if (task.photos && task.photos.length) {
             for (const photo of task.photos) {
                 try {
-                    if (!photo.startsWith("http")) {
-                        await ctx.replyWithPhoto(photo);
+                    // Проверяем, что photo это объект или строка
+                    if (typeof photo === 'string') {
+                        // Если это строка, проверяем начинается ли она с http
+                        if (photo.startsWith("http")) {
+                            await ctx.replyWithPhoto({ url: photo });
+                        } else {
+                            await ctx.replyWithPhoto(photo);
+                        }
+                    } else if (photo && photo.url) {
+                        // Если это объект с URL
+                        await ctx.replyWithPhoto({ url: photo.url });
+                    } else if (photo && photo.file_id) {
+                        // Если это объект с file_id
+                        await ctx.replyWithPhoto(photo.file_id);
                     } else {
-                        await ctx.replyWithPhoto({ url: photo });
+                        console.log('Неизвестный формат фото:', photo);
                     }
                 } catch (photoError) {
                     console.error(`Ошибка при отправке фото для задания ${taskId}:`, photoError.message);
