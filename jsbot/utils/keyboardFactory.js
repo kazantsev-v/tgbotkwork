@@ -130,7 +130,11 @@ class KeyboardSender {
       const safeText = !text || text.trim() === '' ? ' ' : text;
       
       if (clearPrevious) {
-        await ctx.reply(" ", Markup.removeKeyboard());
+        try {
+          await ctx.reply(" ", Markup.removeKeyboard());
+        } catch (err) {
+          console.warn('Ошибка при удалении предыдущей клавиатуры:', err);
+        }
       }
       
       const messageOptions = {

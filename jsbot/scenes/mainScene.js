@@ -71,7 +71,12 @@ mainScene.enter(async (ctx) => {
     }
 
     // Используем новую функцию sendKeyboard для безопасного отображения кнопок
-    await sendKeyboard(ctx, 'Выберите действие:', Markup.inlineKeyboard(buttons, { columns: 2 }).resize());
+    await sendKeyboard(
+        ctx,
+        'Выберите действие:',
+        Markup.inlineKeyboard(buttons, { columns: 2 }).resize(),
+        { clearPrevious: false }
+    );
 });
 
 mainScene.action('profile', async (ctx) => {
