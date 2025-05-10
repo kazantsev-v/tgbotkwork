@@ -22,7 +22,9 @@ welcomeScene.enter(async (ctx) => {
             console.log(`Профиль найден: ${JSON.stringify(profile)}`);
 
             if (profile.role === 'moderator') {
-                return;
+                // При модераторе сразу переходим в главное меню
+                ctx.session.role = 'moderator';
+                return ctx.scene.enter('mainScene');
             } else if (profile.role === 'customer') {
                 // Загружаем профиль заказчика
                 try {
