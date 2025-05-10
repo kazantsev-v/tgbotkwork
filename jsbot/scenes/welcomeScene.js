@@ -30,6 +30,7 @@ welcomeScene.enter(async (ctx) => {
                         Markup.button.url('Открыть админ-панель', adminPanelUrl)
                     ])
                 );
+                return;
             } else if (profile.role === 'customer') {
                 // Загружаем профиль заказчика
                 try {
