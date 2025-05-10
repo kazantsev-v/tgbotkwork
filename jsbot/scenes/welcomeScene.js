@@ -24,7 +24,12 @@ welcomeScene.enter(async (ctx) => {
             if (profile.role === 'moderator') {
                 // При модераторе сразу переходим в главное меню
                 ctx.session.role = 'moderator';
-                return ctx.scene.enter('mainScene');
+                await ctx.reply(
+                    "Перейти в админ-панель:",
+                    Markup.inlineKeyboard([
+                        Markup.button.url('Открыть админ-панель', adminPanelUrl)
+                    ])
+                );
             } else if (profile.role === 'customer') {
                 // Загружаем профиль заказчика
                 try {
