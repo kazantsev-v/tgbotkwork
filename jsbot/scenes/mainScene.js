@@ -1,6 +1,7 @@
 const { Scenes, Markup } = require('telegraf');
 const { updateUserSceneStep } = require('../utils/user');
 const { sendKeyboard, clearKeyboard } = require('../utils/keyboardManager');
+const { config } = require('../config/config');
 
 const mainScene = new Scenes.BaseScene('mainScene');
 
@@ -10,7 +11,10 @@ mainScene.enter(async (ctx) => {
 
     await updateUserSceneStep(ctx.from.id, ctx.scene.current.id, ctx.session.step);
     const isCustomer = ctx.session.role === 'customer'; // Проверка роли (заказчик или рабочий)
-    console.log(ctx.session.role)
+    const isModerator = ctx.session.role === 'moderator'; // Проверка роли модератора
+    
+    console.log(ctx.session.role);
+    
     const customerButtons = [
         [
             Markup.button.callback('Профиль', 'profile')
@@ -45,8 +49,26 @@ mainScene.enter(async (ctx) => {
             Markup.button.callback('Настройки', 'settings')
         ]
     ];
+    
+    const moderatorButtons = [
+        [
+            Markup.button.callback('Профиль', 'profile')
+        ],
+        [
+            Markup.button.callback('Админ панель', 'admin_panel')
+        ],
+        [
+            Markup.button.callback('Настройки', 'settings')
+        ]
+    ];
 
-    const buttons = isCustomer ? customerButtons : workerButtons;
+    // Выбираем набор кнопок в зависимости от роли
+    let buttons;
+    if (isModerator) {
+        buttons = moderatorButtons;
+    } else {
+        buttons = isCustomer ? customerButtons : workerButtons;
+    }
 
     // Используем новую функцию sendKeyboard для безопасного отображения кнопок
     await sendKeyboard(ctx, 'Выберите действие:', Markup.inlineKeyboard(buttons, { columns: 2 }).resize());
@@ -78,6 +100,24 @@ mainScene.action('view_tasks', async (ctx) => {
 
 mainScene.action('settings', async (ctx) => {
     await ctx.reply("Настройки в данный момент не доступны");
+});
+
+mainScene.action('admin_panel', async (ctx) => {
+    // Проверка на роль модератора для безопасности
+    if (ctx.session.role !== 'moderator') {
+        return await ctx.reply("У вас нет доступа к админ-панели");
+    }
+    
+    // Формируем URL админ-панели
+    const adminPanelUrl = config.adminPanelURL || 'http://localhost:4200';
+    
+    // Отправляем ссылку на админ-панель
+    await ctx.reply(
+        "Перейти в админ-панель:",
+        Markup.inlineKeyboard([
+            Markup.button.url('Открыть админ-панель', adminPanelUrl)
+        ])
+    );
 });
 
 mainScene.action('reminders', async (ctx) => {
